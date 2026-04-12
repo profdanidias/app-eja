@@ -128,14 +128,20 @@ const mesAtual = new Date().getMonth() + 1;
 
 function campoMes(label, nome, id, numeroMes){
     let bloqueado = numeroMes > mesAtual ? "disabled" : "";
-    return `${label}: <input type="number" min="0" name="${nome}_${id}" ${bloqueado}>`;
+
+    return `
+    <div style="display:inline-block; margin-right:10px;">
+        ${label}: <input type="number" min="0" name="${nome}_${id}" style="width:70px;" ${bloqueado}>
+    </div>
+    `;
 }
 
-// ================= REGRA NÃO SEI =================
+// ================= REGRAS NÃO / NÃO SEI =================
 function controlarQuantidade(select, campoQtdId) {
+
     let campo = document.getElementById(campoQtdId);
 
-    if (select.value === "não sei") {
+    if (select.value === "não" || select.value === "não sei") {
         campo.value = 0;
         campo.disabled = true;
     } else {
@@ -174,14 +180,14 @@ document.getElementById("municipios").addEventListener("change", function(){
 
             <input type="hidden" name="nome_${id}" value="${nome}">
 
-            <label>Formador Local:</label>
+            <label>Há Formador Local?</label>
             <select name="formador_local_${id}">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
                 <option value="não identificado">Não identificado</option>
             </select><br><br>
 
-            <label>PBA:</label>
+            <label>Há turmas de PBA?</label>
             <select name="pba_${id}" onchange="controlarQuantidade(this, 'pba_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
@@ -189,7 +195,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             </select>
             Quantidade: <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
 
-            <label>Alfabetização EJA:</label>
+            <label>Há turmas de Alfabetização EJA?</label>
             <select name="eja_alf_${id}" onchange="controlarQuantidade(this, 'eja_alf_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
@@ -197,7 +203,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             </select>
             Quantidade: <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
 
-            <label>EJA Anos Iniciais:</label>
+            <label>Há turmas de EJA Anos Iniciais?</label>
             <select name="eja_ai_${id}" onchange="controlarQuantidade(this, 'eja_ai_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
