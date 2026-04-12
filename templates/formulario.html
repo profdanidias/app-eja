@@ -1,127 +1,142 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script>
-async function carregarEstados(){
- let r=await fetch('/estados');
- let estados=await r.json();
- let s=document.getElementById('estado');
-
- estados.forEach(e=>{
-  let o=document.createElement('option');
-  o.value=e.sigla;
-  o.text=e.nome;
-  s.appendChild(o);
- });
-}
-<a href="/dashboard">
-<button type="button">Ir para Dashboard</button>
-</a>
-
-async function carregarMunicipios(){
- let uf=document.getElementById('estado').value;
-
- if(!uf){
-  alert("Selecione um estado");
-  return;
- }
-
- let r=await fetch('/municipios/'+uf);
- let lista=await r.json();
-
- let div=document.getElementById('municipios');
- div.innerHTML="<h3>Selecione os municípios:</h3>";
-
- lista.forEach(m=>{
-  div.innerHTML+=`
-  <input type="checkbox" name="municipios" value="${m.id}" 
-  onchange="bloco(${m.id},'${m.nome}')">${m.nome}<br>`;
- });
-
- // MOSTRA BOTÃO DE ENVIO
- document.getElementById('btnEnviar').style.display = "block";
-}
-
-function bloco(id,nome){
- let c=document.getElementById('blocos');
-
- if(document.getElementById('b'+id)){
-  document.getElementById('b'+id).remove();
-  return;
- }
-
- let div=document.createElement('div');
- div.id='b'+id;
-
- div.innerHTML=`
- <hr>
- <h3>${nome}</h3>
- <input type="hidden" name="nome_${id}" value="${nome}">
-
- Há Formador Local?
- <input type="radio" name="formador_local_${id}" value="sim">Sim
- <input type="radio" name="formador_local_${id}" value="nao">Não<br>
-
- Há turmas de PBA?
- <input type="radio" name="pba_${id}" value="sim">Sim
- <input type="radio" name="pba_${id}" value="nao">Não
- <input type="radio" name="pba_${id}" value="nao_sei">Não sei
- Quantas turmas? <input name="pba_qtd_${id}"><br>
-
- Há turmas de Alfabetização EJA?
- <input type="radio" name="eja_alf_${id}" value="sim">Sim
- <input type="radio" name="eja_alf_${id}" value="nao">Não
- Quantas turmas? <input name="eja_alf_qtd_${id}"><br>
-
- EJA Anos Iniciais:
- <input type="radio" name="eja_ai_${id}" value="sim">Sim
- <input type="radio" name="eja_ai_${id}" value="nao">Não
- <input type="radio" name="eja_ai_${id}" value="nao_sei">Não sei
- Quantas turmas? <input name="eja_ai_qtd_${id}"><br>
-
- Participantes por mês:<br>
- Jan <input name="jan_${id}">
- Fev <input name="fev_${id}">
- Mar <input name="mar_${id}">
- Abr <input name="abr_${id}">
- Mai <input name="mai_${id}">
- Jun <input name="jun_${id}">
- Jul <input name="jul_${id}">
- Ago <input name="ago_${id}">
- Set <input name="setm_${id}">
- `;
-
- c.appendChild(div);
-}
-
-window.onload=carregarEstados;
-</script>
+    <title>Formulário EJA</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
 
-<h2>Formulário</h2>
+<div class="container">
+    <h2>Formulário - Formador Regional</h2>
 
-<form method="POST" action="/salvar">
+    <form method="POST" action="/salvar">
 
-Estado:
-<select id="estado" name="estado"></select>
+        <!-- ESTADO -->
+        <label>Estado:</label>
+        <select id="estado" name="estado"></select>
 
-<button type="button" onclick="carregarMunicipios()">
-Carregar Municípios
-</button>
+        <!-- MUNICÍPIOS -->
+        <label>Municípios:</label>
+        <select id="municipios" multiple name="municipios"></select>
 
-<div id="municipios"></div>
+        <br><br>
 
-<div id="blocos"></div>
+        <div id="blocos"></div>
 
-<br>
+        <br>
+        <button type="submit">Salvar Informações</button>
 
-<button id="btnEnviar" style="display:none;">
-Enviar respostas
-</button>
+        <br><br>
+        <a href="/dashboard">
+            <button type="button">Ir para Dashboard</button>
+        </a>
 
-</form>
+    </form>
+</div>
+
+<script>
+// 🔹 CARREGAR ESTADOS
+fetch("/estados")
+.then(r => r.json())
+.then(estados => {
+    let select = document.getElementById("estado");
+
+    estados.sort((a,b)=>a.nome.localeCompare(b.nome));
+
+    estados.forEach(e=>{
+        let opt = document.createElement("option");
+        opt.value = e.sigla;
+        opt.text = e.nome;
+        select.appendChild(opt);
+    });
+});
+
+// 🔹 CARREGAR MUNICÍPIOS
+document.getElementById("estado").addEventListener("change", function(){
+
+    let uf = this.value;
+
+    fetch("/municipios/" + uf)
+    .then(r=>r.json())
+    .then(muns=>{
+        let select = document.getElementById("municipios");
+        select.innerHTML = "";
+
+        muns.forEach(m=>{
+            let opt = document.createElement("option");
+            opt.value = m.id;
+            opt.text = m.nome;
+            select.appendChild(opt);
+        });
+    });
+});
+
+// 🔹 GERAR PERGUNTAS
+document.getElementById("municipios").addEventListener("change", function(){
+
+    let blocos = document.getElementById("blocos");
+    blocos.innerHTML = "";
+
+    Array.from(this.selectedOptions).forEach(opt => {
+
+        let id = opt.value;
+        let nome = opt.text;
+
+        let div = document.createElement("div");
+
+        div.innerHTML = `
+        <h3>${nome}</h3>
+        <input type="hidden" name="nome_${id}" value="${nome}">
+
+        Formador Local:
+        <select name="formador_local_${id}">
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+        </select><br>
+
+        PBA:
+        <select name="pba_${id}">
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não sei">Não sei</option>
+        </select>
+        Quantidade: <input type="number" name="pba_qtd_${id}"><br>
+
+        Alfabetização EJA:
+        <select name="eja_alf_${id}">
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não sei">Não sei</option>
+        </select>
+        Quantidade: <input type="number" name="eja_alf_qtd_${id}"><br>
+
+        EJA Anos Iniciais:
+        <select name="eja_ai_${id}">
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não sei">Não sei</option>
+        </select>
+        Quantidade: <input type="number" name="eja_ai_qtd_${id}"><br>
+
+        <b>Formação presencial (participantes)</b><br>
+
+        Jan: <input type="number" name="jan_${id}">
+        Fev: <input type="number" name="fev_${id}">
+        Mar: <input type="number" name="mar_${id}">
+        Abr: <input type="number" name="abr_${id}">
+        Mai: <input type="number" name="mai_${id}">
+        Jun: <input type="number" name="jun_${id}">
+        Jul: <input type="number" name="jul_${id}">
+        Ago: <input type="number" name="ago_${id}">
+        Set: <input type="number" name="setm_${id}">
+        `;
+
+        blocos.appendChild(div);
+    });
+
+});
+</script>
 
 </body>
 </html>
