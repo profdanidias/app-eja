@@ -202,7 +202,11 @@ def salvar():
 # ---------------- DASHBOARD COM FILTRO ----------------
 @app.route("/dashboard")
 def dashboard():
-    if session.get("tipo") != "gestor":
+
+    email = request.args.get("email")
+
+    # 🔐 valida gestor direto pela URL
+    if not email or email.lower() not in [g.lower() for g in GESTORES]:
         return "Acesso negado"
 
     estados_filtro = request.args.getlist("estado")
