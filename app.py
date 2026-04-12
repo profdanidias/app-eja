@@ -137,15 +137,15 @@ def salvar():
             request.form.get(f"eja_alf_qtd_{m}") or 0,
             request.form.get(f"eja_ai_{m}"),
             request.form.get(f"eja_ai_qtd_{m}") or 0,
-            request.form.get(f"jan_{m}") or 0,
-            request.form.get(f"fev_{m}") or 0,
-            request.form.get(f"mar_{m}") or 0,
-            request.form.get(f"abr_{m}") or 0,
-            request.form.get(f"mai_{m}") or 0,
-            request.form.get(f"jun_{m}") or 0,
-            request.form.get(f"jul_{m}") or 0,
-            request.form.get(f"ago_{m}") or 0,
-            request.form.get(f"setm_{m}") or 0
+            max(0, int(request.form.get(f"jan_{m}") or 0)),
+            max(0, int(request.form.get(f"fev_{m}") or 0)),
+            max(0, int(request.form.get(f"mar_{m}") or 0)),
+            max(0, int(request.form.get(f"abr_{m}") or 0)),
+            max(0, int(request.form.get(f"mai_{m}") or 0)),
+            max(0, int(request.form.get(f"jun_{m}") or 0)),
+            max(0, int(request.form.get(f"jul_{m}") or 0)),
+            max(0, int(request.form.get(f"ago_{m}") or 0)),
+            max(0, int(request.form.get(f"setm_{m}") or 0))
         ))
 
     conn.commit()

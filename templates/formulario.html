@@ -34,7 +34,7 @@
 
         <br><br>
 
-        <!-- DASHBOARD (SÓ GESTOR) -->
+        <!-- DASHBOARD APENAS PARA GESTOR -->
         {% if session.get("tipo") == "gestor" %}
         <a href="/dashboard">
             <button type="button">Ir para Dashboard</button>
@@ -46,6 +46,7 @@
 </div>
 
 <script>
+
 // ================= ESTADOS =================
 fetch("/estados")
 .then(r => r.json())
@@ -87,6 +88,14 @@ document.getElementById("estado").addEventListener("change", function(){
 
 });
 
+// ================= CONTROLE DE MESES =================
+const mesAtual = new Date().getMonth() + 1;
+
+function campoMes(label, nome, id, numeroMes){
+    let bloqueado = numeroMes > mesAtual ? "disabled" : "";
+    return `${label}: <input type="number" min="0" name="${nome}_${id}" ${bloqueado}>`;
+}
+
 // ================= MULTI MUNICÍPIOS =================
 let selecionados = new Set();
 
@@ -123,7 +132,7 @@ document.getElementById("municipios").addEventListener("change", function(){
                 <option value="não">Não</option>
                 <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input type="number" name="pba_qtd_${id}"><br><br>
+            Quantidade: <input type="number" min="0" name="pba_qtd_${id}"><br><br>
 
             <label>Alfabetização EJA:</label>
             <select name="eja_alf_${id}">
@@ -131,7 +140,7 @@ document.getElementById("municipios").addEventListener("change", function(){
                 <option value="não">Não</option>
                 <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input type="number" name="eja_alf_qtd_${id}"><br><br>
+            Quantidade: <input type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
 
             <label>EJA Anos Iniciais:</label>
             <select name="eja_ai_${id}">
@@ -139,19 +148,19 @@ document.getElementById("municipios").addEventListener("change", function(){
                 <option value="não">Não</option>
                 <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input type="number" name="eja_ai_qtd_${id}"><br><br>
+            Quantidade: <input type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
 
             <b>Formação presencial (quantidade de participantes por mês)</b><br><br>
 
-            Jan: <input type="number" name="jan_${id}">
-            Fev: <input type="number" name="fev_${id}">
-            Mar: <input type="number" name="mar_${id}">
-            Abr: <input type="number" name="abr_${id}">
-            Mai: <input type="number" name="mai_${id}">
-            Jun: <input type="number" name="jun_${id}">
-            Jul: <input type="number" name="jul_${id}">
-            Ago: <input type="number" name="ago_${id}">
-            Set: <input type="number" name="setm_${id}">
+            ${campoMes("Jan", "jan", id, 1)}
+            ${campoMes("Fev", "fev", id, 2)}
+            ${campoMes("Mar", "mar", id, 3)}
+            ${campoMes("Abr", "abr", id, 4)}
+            ${campoMes("Mai", "mai", id, 5)}
+            ${campoMes("Jun", "jun", id, 6)}
+            ${campoMes("Jul", "jul", id, 7)}
+            ${campoMes("Ago", "ago", id, 8)}
+            ${campoMes("Set", "setm", id, 9)}
 
             <hr>
             `;
