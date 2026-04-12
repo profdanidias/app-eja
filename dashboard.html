@@ -1,0 +1,28 @@
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<h2>Dashboard</h2>
+
+<canvas id="estado"></canvas>
+<canvas id="meses"></canvas>
+<canvas id="funcoes"></canvas>
+
+<script>
+let e={{dados_estado|safe}};
+new Chart(document.getElementById('estado'),{
+ type:'bar',
+ data:{labels:e.map(x=>x[0]),datasets:[{data:e.map(x=>x[1])}]}
+});
+
+let m={{meses|safe}};
+new Chart(document.getElementById('meses'),{
+ type:'line',
+ data:{labels:["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"],
+ datasets:[{data:m}]}
+});
+
+let f={{funcoes|safe}};
+new Chart(document.getElementById('funcoes'),{
+ type:'pie',
+ data:{labels:f.map(x=>x[0]),datasets:[{data:f.map(x=>x[1])}]}
+});
+</script>
