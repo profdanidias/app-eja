@@ -1,45 +1,100 @@
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<h2>Dashboard de Monitoramento</h2>
+<div class="container">
 
-<form method="GET">
-    <label><b>Filtrar por Estado:</b></label><br>
-    <select name="estado" multiple size="5">
-        <option value="PB">Paraíba</option>
-        <option value="PE">Pernambuco</option>
-        <option value="RN">Rio Grande do Norte</option>
-        <option value="CE">Ceará</option>
-        <option value="BA">Bahia</option>
+<h2>🇧🇷 Painel Nacional de Monitoramento EJA</h2>
+
+<!-- FILTRO -->
+<form method="GET" class="filtro">
+    <label>Filtrar por Estado:</label>
+    <select name="estado" multiple>
+        <option value="PB">PB</option>
+        <option value="PE">PE</option>
+        <option value="RN">RN</option>
+        <option value="CE">CE</option>
+        <option value="BA">BA</option>
     </select>
-    <br><br>
-    <button type="submit">Filtrar</button>
+    <button type="submit">Aplicar Filtro</button>
 </form>
 
-<hr>
+<!-- CARDS -->
+<div class="cards">
+    <div class="card">
+        <h3>Total Participantes</h3>
+        <p id="total"></p>
+    </div>
 
-<canvas id="graficoEstado"></canvas>
-<canvas id="graficoMeses"></canvas>
-<canvas id="graficoFuncoes"></canvas>
+    <div class="card">
+        <h3>Total Estados</h3>
+        <p id="totalEstados"></p>
+    </div>
+
+    <div class="card">
+        <h3>Acessos por Função</h3>
+        <p id="totalFuncoes"></p>
+    </div>
+</div>
+
+<!-- MAPA -->
+<div id="mapa"></div>
+
+<!-- GRÁFICOS -->
+<div class="graficos">
+    <canvas id="graficoRegiao"></canvas>
+    <canvas id="graficoMeses"></canvas>
+</div>
+
+</div>
 
 <script>
 let dadosEstado = {{dados_estado|safe}};
 let meses = {{meses|safe}};
 let funcoes = {{funcoes|safe}};
 
-// ESTADOS
-new Chart(document.getElementById('graficoEstado'), {
+// TOTAL
+let total = 0;
+meses.forEach(v => total += (v || 0));
+document.getElementById("total").innerText = total;
+
+document.getElementById("totalEstados").innerText = dadosEstado.length;
+document.getElementById("totalFuncoes").innerText = funcoes.length;
+
+// REGIÕES DO BRASIL
+const regioes = {
+    "PB":"Nordeste","PE":"Nordeste","RN":"Nordeste","CE":"Nordeste","BA":"Nordeste",
+    "SP":"Sudeste","RJ":"Sudeste","MG":"Sudeste","ES":"Sudeste",
+    "RS":"Sul","SC":"Sul","PR":"Sul",
+    "GO":"Centro-Oeste","MT":"Centro-Oeste","MS":"Centro-Oeste","DF":"Centro-Oeste",
+    "AM":"Norte","PA":"Norte","AC":"Norte","RO":"Norte","RR":"Norte","AP":"Norte","TO":"Norte"
+};
+
+// SOMAR POR REGIÃO
+let somaRegiao = {};
+
+dadosEstado.forEach(d=>{
+    let uf = d[0];
+    let valor = d[1] || 0;
+    let reg = regioes[uf] || "Outros";
+
+    somaRegiao[reg] = (somaRegiao[reg] || 0) + valor;
+});
+
+// GRÁFICO REGIÃO
+new Chart(document.getElementById('graficoRegiao'), {
     type: 'bar',
     data: {
-        labels: dadosEstado.map(x => x[0]),
+        labels: Object.keys(somaRegiao),
         datasets: [{
-            label: 'Participantes por Estado',
-            data: dadosEstado.map(x => x[1])
+            label: 'Participantes por Região',
+            data: Object.values(somaRegiao)
         }]
     }
 });
 
-// MESES
+// GRÁFICO MESES
 new Chart(document.getElementById('graficoMeses'), {
     type: 'line',
     data: {
@@ -51,14 +106,31 @@ new Chart(document.getElementById('graficoMeses'), {
     }
 });
 
-// FUNÇÕES
-new Chart(document.getElementById('graficoFuncoes'), {
-    type: 'pie',
-    data: {
-        labels: funcoes.map(x => x[0]),
-        datasets: [{
-            data: funcoes.map(x => x[1])
-        }]
+// MAPA
+var mapa = L.map('mapa').setView([-14.2, -51.9], 4);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
+
+// EXEMPLO SIMPLES (marcadores por estado)
+dadosEstado.forEach(d=>{
+    let uf = d[0];
+    let valor = d[1];
+
+    // coordenadas simplificadas (exemplo)
+    let coords = {
+        "PB":[-7.1,-36.8],
+        "PE":[-8.3,-37.1],
+        "RN":[-5.8,-36.6],
+        "CE":[-5.2,-39.5],
+        "BA":[-12.9,-38.5]
+    };
+
+    if(coords[uf]){
+        L.circleMarker(coords[uf],{
+            radius: 8 + (valor/10),
+        })
+        .addTo(mapa)
+        .bindPopup(uf + ": " + valor + " participantes");
     }
 });
 </script>
