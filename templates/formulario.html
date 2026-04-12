@@ -10,13 +10,22 @@
 
 <div class="container">
 
+    <!-- AVISO INSTITUCIONAL -->
+    <div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px;">
+        <b>Atenção:</b> O preenchimento deste formulário substitui automaticamente qualquer envio anterior realizado por este usuário.
+        <br>
+        Para fins de monitoramento, será considerado sempre o <b>último envio realizado</b>.
+    </div>
+
     <h2>Formulário - Formador Regional</h2>
 
-    <form method="POST" action="/salvar">
+    <form method="POST" action="/salvar" onsubmit="return validarFormulario()">
 
         <!-- ESTADO -->
         <label><b>Estado:</b></label><br>
-        <select id="estado" name="estado"></select>
+        <select id="estado" name="estado" required>
+            <option value="" disabled selected>ESCOLHA O SEU ESTADO</option>
+        </select>
 
         <br><br>
 
@@ -26,7 +35,7 @@
 
         <br><br>
 
-        <!-- BLOCOS DINÂMICOS -->
+        <!-- BLOCOS -->
         <div id="blocos"></div>
 
         <br>
@@ -34,7 +43,6 @@
 
         <br><br>
 
-        <!-- DASHBOARD APENAS PARA GESTOR -->
         {% if session.get("tipo") == "gestor" %}
         <a href="/dashboard">
             <button type="button">Ir para Dashboard</button>
@@ -46,6 +54,35 @@
 </div>
 
 <script>
+
+// ================= VALIDAÇÃO GLOBAL =================
+function validarNumero(valor) {
+    if (valor === "") return true;
+    return /^[0-9]+$/.test(valor);
+}
+
+function validarFormulario() {
+
+    let inputs = document.querySelectorAll('input[type="number"]');
+
+    for (let input of inputs) {
+        let valor = input.value;
+
+        if (!validarNumero(valor)) {
+            alert("Por favor, insira apenas números inteiros maiores ou iguais a zero.");
+            input.focus();
+            return false;
+        }
+
+        if (valor !== "" && parseInt(valor) < 0) {
+            alert("Não é permitido inserir números negativos.");
+            input.focus();
+            return false;
+        }
+    }
+
+    return true;
+}
 
 // ================= ESTADOS =================
 fetch("/estados")
@@ -88,7 +125,7 @@ document.getElementById("estado").addEventListener("change", function(){
 
 });
 
-// ================= CONTROLE DE MESES =================
+// ================= BLOQUEIO DE MESES FUTUROS =================
 const mesAtual = new Date().getMonth() + 1;
 
 function campoMes(label, nome, id, numeroMes){
