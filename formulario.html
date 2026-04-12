@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+async function carregarEstados(){
+ let r=await fetch('/estados');
+ let estados=await r.json();
+ let s=document.getElementById('estado');
+ estados.forEach(e=>{
+  let o=document.createElement('option');
+  o.value=e.sigla;
+  o.text=e.nome;
+  s.appendChild(o);
+ });
+}
+
+async function carregarMunicipios(){
+ let uf=document.getElementById('estado').value;
+ let r=await fetch('/municipios/'+uf);
+ let lista=await r.json();
+
+ let div=document.getElementById('municipios');
+ div.innerHTML="";
+
+ lista.forEach(m=>{
+  div.innerHTML+=`
+  <input type="checkbox" name="municipios" value="${m.id}" 
+  onchange="bloco(${m.id},'${m.nome}')">${m.nome}<br>`;
+ });
+}
+
+function bloco(id,nome){
+ let c=document.getElementById('blocos');
+
+ if(document.getElementById('b'+id)){
+  document.getElementById('b'+id).remove();
+  return;
+ }
+
+ let div=document.createElement('div');
+ div.id='b'+id;
+
+ div.innerHTML=`
+ <h3>${nome}</h3>
+ <input type="hidden" name="nome_${id}" value="${nome}">
+
+ PBA:
+ <input type="radio" name="pba_${id}" value="sim">Sim
+ <input type="radio" name="pba_${id}" value="nao">Não
+ <input type="radio" name="pba_${id}" value="nao_sei">Não sei
+ Qtd <input name="pba_qtd_${id}"><br>
+
+ Participantes:<br>
+ Jan <input name="jan_${id}">
+ Fev <input name="fev_${id}">
+ Mar <input name="mar_${id}">
+ Abr <input name="abr_${id}">
+ Mai <input name="mai_${id}">
+ Jun <input name="jun_${id}">
+ Jul <input name="jul_${id}">
+ Ago <input name="ago_${id}">
+ Set <input name="setm_${id}">
+ `;
+
+ c.appendChild(div);
+}
+
+window.onload=carregarEstados;
+</script>
+</head>
+
+<body>
+
+<form method="POST" action="/salvar">
+
+<select id="estado" name="estado" onchange="carregarMunicipios()"></select>
+
+<div id="municipios"></div>
+
+<div id="blocos"></div>
+
+<button>Enviar</button>
+
+</form>
+
+</body>
+</html>
