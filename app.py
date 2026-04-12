@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
 
-GESTORES = ["gestor@email.com"]
+GESTORES = ["professoradanidias@gmail.com"]
 
 # 🔹 CAMINHO CORRETO DO BANCO (IMPORTANTE NO RENDER)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
