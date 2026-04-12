@@ -200,13 +200,28 @@ def dashboard():
     if session.get("tipo") != "gestor":
         return "Acesso negado"
 
+    estados_filtro = request.args.getlist("estado")
+
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("""
-    SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
-    FROM respostas GROUP BY estado
-    """)
+    if estados_filtro:
+        placeholders = ",".join(["?"] * len(estados_filtro))
+
+        cur.execute(f"""
+        SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
+        FROM respostas
+        WHERE estado IN ({placeholders})
+        GROUP BY estado
+        """, estados_filtro)
+
+    else:
+        cur.execute("""
+        SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
+        FROM respostas
+        GROUP BY estado
+        """)
+
     dados_estado = cur.fetchall()
 
     cur.execute("SELECT funcao, COUNT(*) FROM usuarios GROUP BY funcao")
@@ -226,7 +241,6 @@ def dashboard():
         funcoes=funcoes,
         meses=meses
     )
-
 # ---------------- EMBED ----------------
 @app.after_request
 def after_request(response):
