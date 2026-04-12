@@ -1,16 +1,77 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import sqlite3
 import requests
+import os
 
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
 
 GESTORES = ["gestor@email.com"]
 
-def conectar():
-    return sqlite3.connect("database.db")
+# 🔹 CAMINHO CORRETO DO BANCO (IMPORTANTE NO RENDER)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database.db")
 
-# ---------------- LOGIN AUTOMÁTICO (MOODLE) ----------------
+def conectar():
+    return sqlite3.connect(DB_PATH)
+
+# 🔥 CRIAR BANCO AUTOMATICAMENTE
+def criar_banco():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        email TEXT,
+        tipo TEXT,
+        funcao TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS respostas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER,
+        municipio_id INTEGER,
+        municipio_nome TEXT,
+        estado TEXT,
+        formador_local TEXT,
+        pba TEXT,
+        pba_qtd INTEGER,
+        eja_alfabetizacao TEXT,
+        eja_alfabetizacao_qtd INTEGER,
+        eja_anos_iniciais TEXT,
+        eja_anos_iniciais_qtd INTEGER,
+        jan INTEGER,
+        fev INTEGER,
+        mar INTEGER,
+        abr INTEGER,
+        mai INTEGER,
+        jun INTEGER,
+        jul INTEGER,
+        ago INTEGER,
+        setm INTEGER
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS logs_acesso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER,
+        acao TEXT,
+        data_hora DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+# 🔥 CHAMA AO INICIAR
+criar_banco()
+
+# ---------------- LOGIN AUTOMÁTICO ----------------
 @app.route("/", methods=["GET"])
 def auto_login():
     nome = request.args.get("nome")
@@ -24,7 +85,7 @@ def auto_login():
 
     return render_template("login.html")
 
-# ---------------- ESCOLHA DE FUNÇÃO ----------------
+# ---------------- FUNÇÃO ----------------
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
     if request.method == "POST":
@@ -84,11 +145,14 @@ def formulario():
 # ---------------- SALVAR ----------------
 @app.route("/salvar", methods=["POST"])
 def salvar():
+    if "user_id" not in session:
+        return "Sessão expirada"
+
     conn = conectar()
     cur = conn.cursor()
 
     usuario = session["user_id"]
-    estado = request.form["estado"]
+    estado = request.form.get("estado")
 
     municipios = request.form.getlist("municipios")
 
@@ -139,7 +203,10 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm) FROM respostas GROUP BY estado")
+    cur.execute("""
+    SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
+    FROM respostas GROUP BY estado
+    """)
     dados_estado = cur.fetchall()
 
     cur.execute("SELECT funcao, COUNT(*) FROM usuarios GROUP BY funcao")
@@ -160,7 +227,7 @@ def dashboard():
         meses=meses
     )
 
-# ---------------- PERMITIR EMBED NO MOODLE ----------------
+# ---------------- EMBED ----------------
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
