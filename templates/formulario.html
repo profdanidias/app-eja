@@ -42,9 +42,12 @@
 
         <br><br>
 
-        {% if session.get("tipo") == "gestor" %}
+        <!-- DASHBOARD SOMENTE PARA GESTORA -->
+        {% if session.get("email") == "professoradanidias@gmail.com" %}
         <a href="/dashboard">
-            <button type="button">Ir para Dashboard</button>
+            <button type="button" style="background:#28a745; color:white;">
+                VER DASHBOARD
+            </button>
         </a>
         {% endif %}
 
@@ -187,7 +190,7 @@ document.getElementById("municipios").addEventListener("change", function(){
                 <option value="não identificado">Não identificado</option>
             </select><br><br>
 
-            <label>Há turmas de PBA?</label>
+            <label>Há turma de PBA (Programa Brasil Alfabetizado)?</label>
             <select name="pba_${id}" onchange="controlarQuantidade(this, 'pba_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
@@ -195,7 +198,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             </select>
             Quantidade: <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
 
-            <label>Há turmas de Alfabetização EJA?</label>
+            <label>Há turma de Alfabetização EJA?</label>
             <select name="eja_alf_${id}" onchange="controlarQuantidade(this, 'eja_alf_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
@@ -203,7 +206,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             </select>
             Quantidade: <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
 
-            <label>Há turmas de EJA Anos Iniciais?</label>
+            <label>Há turma de EJA (Anos Iniciais do Ensino Fundamental)?</label>
             <select name="eja_ai_${id}" onchange="controlarQuantidade(this, 'eja_ai_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>

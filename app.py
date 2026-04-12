@@ -69,7 +69,7 @@ def auto_login():
 
         return redirect("/funcao")
 
-    return "Acesso via Moodle necessário"
+    return "Acesso via Moodle necessário. Acesse o Curso para Formadores Regionais no endereço https://pactoeja.sead.ufpb.br/"
 
 # FUNÇÃO
 @app.route("/funcao", methods=["GET","POST"])
