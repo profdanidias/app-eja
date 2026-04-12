@@ -1,127 +1,162 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Formulário EJA</title>
-    <link rel="stylesheet" href="/static/style.css">
+<meta charset="UTF-8">
+<title>Formulário EJA</title>
+<link rel="stylesheet" href="/static/style.css">
+
+<style>
+.erro {
+    border: 2px solid red !important;
+}
+</style>
+
 </head>
 
 <body>
 
 <div class="container">
 
-    <!-- AVISO -->
-    <div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px;">
-        <b>Atenção:</b> O preenchimento deste formulário substitui automaticamente qualquer envio anterior realizado por este usuário.
-        <br>
-        Para fins de monitoramento, será considerado sempre o <b>último envio realizado</b>.
-    </div>
+<div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px;">
+<b>Atenção:</b> O preenchimento deste formulário substitui automaticamente qualquer envio anterior realizado por este usuário.
+<br>Será considerado sempre o <b>último envio realizado</b>.
+</div>
 
-    <h2>Formulário - Formador Regional</h2>
+<h2>Formulário - Formador Regional</h2>
 
-    <form method="POST" action="/salvar" onsubmit="return validarFormulario()">
+<form method="POST" action="/salvar" onsubmit="return validarFormulario()">
 
-        <!-- ESTADO -->
-        <label><b>Estado:</b></label><br>
-        <select id="estado" name="estado" required>
-            <option value="" disabled selected>ESCOLHA O SEU ESTADO</option>
-        </select>
+<label><b>Estado:</b></label><br>
+<select id="estado" name="estado" required>
+<option value="" disabled selected>ESCOLHA O SEU ESTADO</option>
+</select>
 
-        <br><br>
+<br><br>
 
-        <!-- MUNICÍPIOS -->
-        <label><b>Municípios (pode selecionar vários):</b></label><br>
-        <select id="municipios" multiple size="8" name="municipios"></select>
+<label><b>Municípios:</b></label><br>
+<select id="municipios" multiple size="8" name="municipios"></select>
 
-        <br><br>
+<br><br>
 
-        <div id="blocos"></div>
+<div id="blocos"></div>
 
-        <br>
-        <button type="submit">Salvar Informações</button>
+<br>
+<button type="submit">Salvar Informações</button>
 
-        <br><br>
+{% if session.get("email") == "professoradanidias@gmail.com" %}
+<br><br>
+<a href="/dashboard">
+<button type="button">VER DASHBOARD</button>
+</a>
+{% endif %}
 
-        <!-- DASHBOARD SOMENTE PARA GESTORA -->
-        {% if session.get("email") == "professoradanidias@gmail.com" %}
-        <a href="/dashboard">
-            <button type="button" style="background:#28a745; color:white;">
-                VER DASHBOARD
-            </button>
-        </a>
-        {% endif %}
-
-    </form>
+</form>
 
 </div>
 
 <script>
 
 // ================= VALIDAÇÃO =================
-function validarNumero(valor) {
-    if (valor === "") return true;
-    return /^[0-9]+$/.test(valor);
+function limparErros(){
+    document.querySelectorAll(".erro").forEach(e=>e.classList.remove("erro"));
 }
 
-function validarFormulario() {
-    let inputs = document.querySelectorAll('input[type="number"]');
+function erroCampo(campo){
+    campo.classList.add("erro");
+}
 
-    for (let input of inputs) {
+function validarFormulario(){
+
+    limparErros();
+
+    let valido = true;
+
+    let selects = document.querySelectorAll("#blocos select");
+
+    selects.forEach(select => {
+        if (!select.value){
+            erroCampo(select);
+            valido = false;
+        }
+    });
+
+    let inputs = document.querySelectorAll("#blocos input[type='number']");
+
+    inputs.forEach(input => {
+
         let valor = input.value;
 
-        if (!validarNumero(valor)) {
-            alert("Por favor, insira apenas números inteiros maiores ou iguais a zero.");
-            input.focus();
-            return false;
+        if (valor === "" || isNaN(valor) || parseInt(valor) < 0){
+            erroCampo(input);
+            valido = false;
         }
 
-        if (valor !== "" && parseInt(valor) < 0) {
-            alert("Não é permitido inserir números negativos.");
-            input.focus();
-            return false;
-        }
+    });
+
+    // REGRA: SIM → quantidade > 0
+    document.querySelectorAll("#blocos").forEach(bloco => {
+
+        let selects = bloco.querySelectorAll("select");
+
+        selects.forEach(sel => {
+
+            if (sel.value === "sim"){
+
+                let qtd = sel.parentElement.querySelector("input[type='number']");
+
+                if (qtd && (qtd.value == "" || parseInt(qtd.value) <= 0)){
+                    erroCampo(qtd);
+                    valido = false;
+                }
+
+            }
+
+        });
+
+    });
+
+    if (!valido){
+        alert("Existem campos obrigatórios não preenchidos ou inválidos.");
     }
 
-    return true;
+    return valido;
 }
+
+// remover erro ao digitar
+document.addEventListener("input", function(e){
+    if (e.target.classList.contains("erro")){
+        e.target.classList.remove("erro");
+    }
+});
 
 // ================= ESTADOS =================
 fetch("/estados")
-.then(r => r.json())
-.then(estados => {
-
+.then(r=>r.json())
+.then(estados=>{
     let select = document.getElementById("estado");
-
     estados.sort((a,b)=>a.nome.localeCompare(b.nome));
-
     estados.forEach(e=>{
-        let opt = document.createElement("option");
-        opt.value = e.sigla;
-        opt.text = e.nome;
+        let opt=document.createElement("option");
+        opt.value=e.sigla;
+        opt.text=e.nome;
         select.appendChild(opt);
     });
-
 });
 
 // ================= MUNICÍPIOS =================
 document.getElementById("estado").addEventListener("change", function(){
 
-    let uf = this.value;
-
-    fetch("/municipios/" + uf)
+    fetch("/municipios/"+this.value)
     .then(r=>r.json())
     .then(muns=>{
-
-        let select = document.getElementById("municipios");
-        select.innerHTML = "";
-
+        let select=document.getElementById("municipios");
+        select.innerHTML="";
         muns.forEach(m=>{
-            let opt = document.createElement("option");
-            opt.value = m.id;
-            opt.text = m.nome;
+            let opt=document.createElement("option");
+            opt.value=m.id;
+            opt.text=m.nome;
             select.appendChild(opt);
         });
-
     });
 
 });
@@ -129,22 +164,19 @@ document.getElementById("estado").addEventListener("change", function(){
 // ================= MESES =================
 const mesAtual = new Date().getMonth() + 1;
 
-function campoMes(label, nome, id, numeroMes){
-    let bloqueado = numeroMes > mesAtual ? "disabled" : "";
-
-    return `
-    <div style="display:inline-block; margin-right:10px;">
-        ${label}: <input type="number" min="0" name="${nome}_${id}" style="width:70px;" ${bloqueado}>
-    </div>
-    `;
+function campoMes(label,nome,id,num){
+    let dis = num > mesAtual ? "disabled" : "";
+    return `<div style="display:inline-block;margin-right:10px;">
+    ${label}: <input type="number" min="0" name="${nome}_${id}" ${dis}>
+    </div>`;
 }
 
-// ================= REGRAS NÃO / NÃO SEI =================
-function controlarQuantidade(select, campoQtdId) {
+// ================= NÃO / NÃO SEI =================
+function controlarQuantidade(select,id){
 
-    let campo = document.getElementById(campoQtdId);
+    let campo = document.getElementById(id);
 
-    if (select.value === "não" || select.value === "não sei") {
+    if (select.value === "não" || select.value === "não sei"){
         campo.value = 0;
         campo.disabled = true;
     } else {
@@ -152,79 +184,79 @@ function controlarQuantidade(select, campoQtdId) {
     }
 }
 
-// ================= MULTI MUNICÍPIOS =================
+// ================= MUNICÍPIOS =================
 let selecionados = new Set();
 
 document.getElementById("municipios").addEventListener("change", function(){
 
     let blocos = document.getElementById("blocos");
 
-    Array.from(this.selectedOptions).forEach(opt => {
+    Array.from(this.selectedOptions).forEach(opt=>{
 
         let id = opt.value;
 
-        if (!selecionados.has(id)) {
+        if (!selecionados.has(id)){
 
             selecionados.add(id);
 
             let nome = opt.text;
 
             let div = document.createElement("div");
-            div.setAttribute("id", "bloco_" + id);
+            div.id = "bloco_"+id;
 
             div.innerHTML = `
             <h3>${nome}</h3>
 
-            <button type="button" onclick="removerMunicipio('${id}')">
-                RETIRAR MUNICÍPIO
-            </button>
-
-            <br><br>
+            <button type="button" onclick="removerMunicipio('${id}')">RETIRAR MUNICÍPIO</button><br><br>
 
             <input type="hidden" name="nome_${id}" value="${nome}">
 
-            <label>Há Formador Local?</label>
+            Há Formador Local?
             <select name="formador_local_${id}">
-                <option value="sim">Sim</option>
-                <option value="não">Não</option>
-                <option value="não identificado">Não identificado</option>
+            <option value="">Selecione</option>
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não identificado">Não identificado</option>
             </select><br><br>
 
-            <label>Há turma de PBA (Programa Brasil Alfabetizado)?</label>
-            <select name="pba_${id}" onchange="controlarQuantidade(this, 'pba_qtd_${id}')">
-                <option value="sim">Sim</option>
-                <option value="não">Não</option>
-                <option value="não sei">Não sei</option>
+            Há turma de PBA?
+            <select name="pba_${id}" onchange="controlarQuantidade(this,'pba_qtd_${id}')">
+            <option value="">Selecione</option>
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não sei">Não sei</option>
             </select>
             Quantidade: <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
 
-            <label>Há turma de Alfabetização EJA?</label>
-            <select name="eja_alf_${id}" onchange="controlarQuantidade(this, 'eja_alf_qtd_${id}')">
-                <option value="sim">Sim</option>
-                <option value="não">Não</option>
-                <option value="não sei">Não sei</option>
+            Há turma de Alfabetização da EJA?
+            <select name="eja_alf_${id}" onchange="controlarQuantidade(this,'eja_alf_qtd_${id}')">
+            <option value="">Selecione</option>
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não sei">Não sei</option>
             </select>
             Quantidade: <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
 
-            <label>Há turma de EJA (Anos Iniciais do Ensino Fundamental)?</label>
-            <select name="eja_ai_${id}" onchange="controlarQuantidade(this, 'eja_ai_qtd_${id}')">
-                <option value="sim">Sim</option>
-                <option value="não">Não</option>
-                <option value="não sei">Não sei</option>
+            Há turma de EJA (Anos Iniciais do Ensino Fundamental):
+            <select name="eja_ai_${id}" onchange="controlarQuantidade(this,'eja_ai_qtd_${id}')">
+            <option value="">Selecione</option>
+            <option value="sim">Sim</option>
+            <option value="não">Não</option>
+            <option value="não sei">Não sei</option>
             </select>
             Quantidade: <input id="eja_ai_qtd_${id}" type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
 
             <b>Formação presencial (quantidade de participantes por mês)</b><br><br>
 
-            ${campoMes("Jan", "jan", id, 1)}
-            ${campoMes("Fev", "fev", id, 2)}
-            ${campoMes("Mar", "mar", id, 3)}
-            ${campoMes("Abr", "abr", id, 4)}
-            ${campoMes("Mai", "mai", id, 5)}
-            ${campoMes("Jun", "jun", id, 6)}
-            ${campoMes("Jul", "jul", id, 7)}
-            ${campoMes("Ago", "ago", id, 8)}
-            ${campoMes("Set", "setm", id, 9)}
+            ${campoMes("Jan","jan",id,1)}
+            ${campoMes("Fev","fev",id,2)}
+            ${campoMes("Mar","mar",id,3)}
+            ${campoMes("Abr","abr",id,4)}
+            ${campoMes("Mai","mai",id,5)}
+            ${campoMes("Jun","jun",id,6)}
+            ${campoMes("Jul","jul",id,7)}
+            ${campoMes("Ago","ago",id,8)}
+            ${campoMes("Set","setm",id,9)}
 
             <hr>
             `;
@@ -236,22 +268,17 @@ document.getElementById("municipios").addEventListener("change", function(){
 
 });
 
-// ================= REMOVER MUNICÍPIO =================
+// ================= REMOVER =================
 function removerMunicipio(id){
-
-    let bloco = document.getElementById("bloco_" + id);
-    if (bloco) bloco.remove();
-
+    document.getElementById("bloco_"+id)?.remove();
     selecionados.delete(id);
 
     let select = document.getElementById("municipios");
-    Array.from(select.options).forEach(opt=>{
-        if (opt.value == id){
-            opt.selected = false;
-        }
+    Array.from(select.options).forEach(o=>{
+        if (o.value==id) o.selected=false;
     });
-
 }
+
 </script>
 
 </body>
