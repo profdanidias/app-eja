@@ -6,6 +6,7 @@ async function carregarEstados(){
  let r=await fetch('/estados');
  let estados=await r.json();
  let s=document.getElementById('estado');
+
  estados.forEach(e=>{
   let o=document.createElement('option');
   o.value=e.sigla;
@@ -16,17 +17,26 @@ async function carregarEstados(){
 
 async function carregarMunicipios(){
  let uf=document.getElementById('estado').value;
+
+ if(!uf){
+  alert("Selecione um estado");
+  return;
+ }
+
  let r=await fetch('/municipios/'+uf);
  let lista=await r.json();
 
  let div=document.getElementById('municipios');
- div.innerHTML="";
+ div.innerHTML="<h3>Selecione os municípios:</h3>";
 
  lista.forEach(m=>{
   div.innerHTML+=`
   <input type="checkbox" name="municipios" value="${m.id}" 
   onchange="bloco(${m.id},'${m.nome}')">${m.nome}<br>`;
  });
+
+ // MOSTRA BOTÃO DE ENVIO
+ document.getElementById('btnEnviar').style.display = "block";
 }
 
 function bloco(id,nome){
@@ -41,8 +51,13 @@ function bloco(id,nome){
  div.id='b'+id;
 
  div.innerHTML=`
+ <hr>
  <h3>${nome}</h3>
  <input type="hidden" name="nome_${id}" value="${nome}">
+
+ Formador Local:
+ <input type="radio" name="formador_local_${id}" value="sim">Sim
+ <input type="radio" name="formador_local_${id}" value="nao">Não<br>
 
  PBA:
  <input type="radio" name="pba_${id}" value="sim">Sim
@@ -50,7 +65,18 @@ function bloco(id,nome){
  <input type="radio" name="pba_${id}" value="nao_sei">Não sei
  Qtd <input name="pba_qtd_${id}"><br>
 
- Participantes:<br>
+ Alfabetização EJA:
+ <input type="radio" name="eja_alf_${id}" value="sim">Sim
+ <input type="radio" name="eja_alf_${id}" value="nao">Não
+ Qtd <input name="eja_alf_qtd_${id}"><br>
+
+ EJA Anos Iniciais:
+ <input type="radio" name="eja_ai_${id}" value="sim">Sim
+ <input type="radio" name="eja_ai_${id}" value="nao">Não
+ <input type="radio" name="eja_ai_${id}" value="nao_sei">Não sei
+ Qtd <input name="eja_ai_qtd_${id}"><br>
+
+ Participantes por mês:<br>
  Jan <input name="jan_${id}">
  Fev <input name="fev_${id}">
  Mar <input name="mar_${id}">
@@ -71,15 +97,26 @@ window.onload=carregarEstados;
 
 <body>
 
+<h2>Formulário</h2>
+
 <form method="POST" action="/salvar">
 
-<select id="estado" name="estado" onchange="carregarMunicipios()"></select>
+Estado:
+<select id="estado" name="estado"></select>
+
+<button type="button" onclick="carregarMunicipios()">
+Carregar Municípios
+</button>
 
 <div id="municipios"></div>
 
 <div id="blocos"></div>
 
-<button>Enviar</button>
+<br>
+
+<button id="btnEnviar" style="display:none;">
+Enviar respostas
+</button>
 
 </form>
 
