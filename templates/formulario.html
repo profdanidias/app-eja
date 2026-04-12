@@ -19,7 +19,7 @@
 
 <div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px;">
 <b>Atenção:</b> O preenchimento deste formulário substitui automaticamente qualquer envio anterior realizado por este usuário.
-<br>Será considerado sempre o <b>último envio realizado</b>.
+<br>Para fins de monitoramento, será considerado sempre o <b>último envio realizado</b>.
 </div>
 
 <h2>Formulário - Formador Regional</h2>
@@ -46,7 +46,9 @@
 {% if session.get("email") == "professoradanidias@gmail.com" %}
 <br><br>
 <a href="/dashboard">
-<button type="button">VER DASHBOARD</button>
+<button type="button" style="background:#28a745; color:white;">
+VER DASHBOARD
+</button>
 </a>
 {% endif %}
 
@@ -55,6 +57,9 @@
 </div>
 
 <script>
+
+// ================= CONFIG =================
+const mesAtual = new Date().getMonth() + 1;
 
 // ================= VALIDAÇÃO =================
 function limparErros(){
@@ -68,21 +73,62 @@ function erroCampo(campo){
 function validarFormulario(){
 
     limparErros();
-
     let valido = true;
 
-    let selects = document.querySelectorAll("#blocos select");
+    let blocos = document.querySelectorAll("#blocos > div");
 
-    selects.forEach(select => {
-        if (!select.value){
-            erroCampo(select);
-            valido = false;
-        }
+    blocos.forEach(bloco => {
+
+        let selects = bloco.querySelectorAll("select");
+
+        selects.forEach(select => {
+            if (!select.value){
+                erroCampo(select);
+                valido = false;
+            }
+        });
+
+        let pares = [
+            ["pba", "pba_qtd"],
+            ["eja_alf", "eja_alf_qtd"],
+            ["eja_ai", "eja_ai_qtd"]
+        ];
+
+        pares.forEach(([campo, qtd]) => {
+
+            let sel = bloco.querySelector(`[name^="${campo}_"]`);
+            let input = bloco.querySelector(`[name^="${qtd}_"]`);
+
+            if (!sel || !input) return;
+
+            if (input.disabled) return;
+
+            let valor = input.value;
+
+            if (valor === "" || isNaN(valor) || parseInt(valor) < 0){
+                erroCampo(input);
+                valido = false;
+                return;
+            }
+
+            if (sel.value === "sim" && parseInt(valor) <= 0){
+                erroCampo(input);
+                valido = false;
+            }
+
+            if ((sel.value === "não" || sel.value === "não sei") && parseInt(valor) !== 0){
+                erroCampo(input);
+                valido = false;
+            }
+
+        });
+
     });
 
-    let inputs = document.querySelectorAll("#blocos input[type='number']");
+    // validar meses visíveis
+    let meses = document.querySelectorAll(".mes");
 
-    inputs.forEach(input => {
+    meses.forEach(input => {
 
         let valor = input.value;
 
@@ -90,28 +136,6 @@ function validarFormulario(){
             erroCampo(input);
             valido = false;
         }
-
-    });
-
-    // REGRA: SIM → quantidade > 0
-    document.querySelectorAll("#blocos").forEach(bloco => {
-
-        let selects = bloco.querySelectorAll("select");
-
-        selects.forEach(sel => {
-
-            if (sel.value === "sim"){
-
-                let qtd = sel.parentElement.querySelector("input[type='number']");
-
-                if (qtd && (qtd.value == "" || parseInt(qtd.value) <= 0)){
-                    erroCampo(qtd);
-                    valido = false;
-                }
-
-            }
-
-        });
 
     });
 
@@ -161,14 +185,33 @@ document.getElementById("estado").addEventListener("change", function(){
 
 });
 
-// ================= MESES =================
-const mesAtual = new Date().getMonth() + 1;
+// ================= MESES DINÂMICOS =================
+function gerarMeses(id){
 
-function campoMes(label,nome,id,num){
-    let dis = num > mesAtual ? "disabled" : "";
-    return `<div style="display:inline-block;margin-right:10px;">
-    ${label}: <input type="number" min="0" name="${nome}_${id}" ${dis}>
-    </div>`;
+    const meses = [
+        ["Jan","jan"],["Fev","fev"],["Mar","mar"],["Abr","abr"],
+        ["Mai","mai"],["Jun","jun"],["Jul","jul"],["Ago","ago"],["Set","setm"]
+    ];
+
+    let html = "";
+
+    meses.forEach((m, index) => {
+
+        let numeroMes = index + 1;
+
+        if (numeroMes <= mesAtual){
+
+            html += `
+            <div style="display:inline-block;margin-right:10px;">
+            ${m[0]}:
+            <input class="mes" type="number" min="0" name="${m[1]}_${id}" style="width:70px;">
+            </div>
+            `;
+        }
+
+    });
+
+    return html;
 }
 
 // ================= NÃO / NÃO SEI =================
@@ -226,7 +269,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             <option value="não">Não</option>
             <option value="não sei">Não sei</option>
             </select>
-            Se sim, quantas turmas? <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
+            Se sim, quantas? <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
 
             Há turma de Alfabetização da EJA?
             <select name="eja_alf_${id}" onchange="controlarQuantidade(this,'eja_alf_qtd_${id}')">
@@ -248,15 +291,7 @@ document.getElementById("municipios").addEventListener("change", function(){
 
             <b>Formação presencial (Quantidade de participantes por mês | PBA + Escolas)</b><br><br>
 
-            ${campoMes("Jan","jan",id,1)}
-            ${campoMes("Fev","fev",id,2)}
-            ${campoMes("Mar","mar",id,3)}
-            ${campoMes("Abr","abr",id,4)}
-            ${campoMes("Mai","mai",id,5)}
-            ${campoMes("Jun","jun",id,6)}
-            ${campoMes("Jul","jul",id,7)}
-            ${campoMes("Ago","ago",id,8)}
-            ${campoMes("Set","setm",id,9)}
+            ${gerarMeses(id)}
 
             <hr>
             `;
