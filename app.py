@@ -6,16 +6,17 @@ import os
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
 
+# 🔐 LISTA DE GESTORES
 GESTORES = ["professoradanidias@gmail.com"]
 
-# 🔹 CAMINHO CORRETO DO BANCO (IMPORTANTE NO RENDER)
+# 📁 CAMINHO DO BANCO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
 def conectar():
     return sqlite3.connect(DB_PATH)
 
-# 🔥 CRIAR BANCO AUTOMATICAMENTE
+# 🧱 CRIAR BANCO AUTOMATICAMENTE
 def criar_banco():
     conn = conectar()
     cur = conn.cursor()
@@ -68,10 +69,10 @@ def criar_banco():
     conn.commit()
     conn.close()
 
-# 🔥 CHAMA AO INICIAR
+# 🚀 INICIALIZA BANCO
 criar_banco()
 
-# ---------------- LOGIN AUTOMÁTICO ----------------
+# ---------------- LOGIN AUTOMÁTICO (Moodle) ----------------
 @app.route("/", methods=["GET"])
 def auto_login():
     nome = request.args.get("nome")
@@ -80,12 +81,17 @@ def auto_login():
     if nome and email:
         session["nome"] = nome
         session["email"] = email
-        session["tipo"] = "gestor" if email in GESTORES else "formador"
+
+        if email.lower() in [g.lower() for g in GESTORES]:
+            session["tipo"] = "gestor"
+        else:
+            session["tipo"] = "formador"
+
         return redirect("/funcao")
 
     return render_template("login.html")
 
-# ---------------- FUNÇÃO ----------------
+# ---------------- ESCOLHA DE FUNÇÃO ----------------
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
     if request.method == "POST":
@@ -153,7 +159,6 @@ def salvar():
 
     usuario = session["user_id"]
     estado = request.form.get("estado")
-
     municipios = request.form.getlist("municipios")
 
     for m in municipios:
@@ -194,7 +199,7 @@ def salvar():
 
     return "Dados enviados com sucesso!"
 
-# ---------------- DASHBOARD ----------------
+# ---------------- DASHBOARD COM FILTRO ----------------
 @app.route("/dashboard")
 def dashboard():
     if session.get("tipo") != "gestor":
@@ -214,7 +219,6 @@ def dashboard():
         WHERE estado IN ({placeholders})
         GROUP BY estado
         """, estados_filtro)
-
     else:
         cur.execute("""
         SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
@@ -241,11 +245,13 @@ def dashboard():
         funcoes=funcoes,
         meses=meses
     )
-# ---------------- EMBED ----------------
+
+# ---------------- PERMITIR EMBED ----------------
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
     return response
 
+# ---------------- EXECUÇÃO ----------------
 if __name__ == "__main__":
     app.run()
