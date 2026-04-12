@@ -35,7 +35,6 @@
 
         <br><br>
 
-        <!-- BLOCOS -->
         <div id="blocos"></div>
 
         <br>
@@ -132,6 +131,18 @@ function campoMes(label, nome, id, numeroMes){
     return `${label}: <input type="number" min="0" name="${nome}_${id}" ${bloqueado}>`;
 }
 
+// ================= REGRA NÃO SEI =================
+function controlarQuantidade(select, campoQtdId) {
+    let campo = document.getElementById(campoQtdId);
+
+    if (select.value === "não sei") {
+        campo.value = 0;
+        campo.disabled = true;
+    } else {
+        campo.disabled = false;
+    }
+}
+
 // ================= MULTI MUNICÍPIOS =================
 let selecionados = new Set();
 
@@ -163,35 +174,36 @@ document.getElementById("municipios").addEventListener("change", function(){
 
             <input type="hidden" name="nome_${id}" value="${nome}">
 
-            <label>Há Formador Local?</label>
+            <label>Formador Local:</label>
             <select name="formador_local_${id}">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
+                <option value="não identificado">Não identificado</option>
             </select><br><br>
 
-            <label>Há turmas de PBA?</label>
-            <select name="pba_${id}">
+            <label>PBA:</label>
+            <select name="pba_${id}" onchange="controlarQuantidade(this, 'pba_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
                 <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input type="number" min="0" name="pba_qtd_${id}"><br><br>
+            Quantidade: <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
 
-            <label>Há turmas de Alfabetização EJA?</label>
-            <select name="eja_alf_${id}">
+            <label>Alfabetização EJA:</label>
+            <select name="eja_alf_${id}" onchange="controlarQuantidade(this, 'eja_alf_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
                 <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
+            Quantidade: <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
 
-            <label>Há turmas de EJA Anos Iniciais?</label>
-            <select name="eja_ai_${id}">
+            <label>EJA Anos Iniciais:</label>
+            <select name="eja_ai_${id}" onchange="controlarQuantidade(this, 'eja_ai_qtd_${id}')">
                 <option value="sim">Sim</option>
                 <option value="não">Não</option>
                 <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
+            Quantidade: <input id="eja_ai_qtd_${id}" type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
 
             <b>Formação presencial (quantidade de participantes por mês)</b><br><br>
 
@@ -218,14 +230,11 @@ document.getElementById("municipios").addEventListener("change", function(){
 // ================= REMOVER MUNICÍPIO =================
 function removerMunicipio(id){
 
-    // remove bloco visual
     let bloco = document.getElementById("bloco_" + id);
     if (bloco) bloco.remove();
 
-    // remove da lista de selecionados
     selecionados.delete(id);
 
-    // desmarca no select
     let select = document.getElementById("municipios");
     Array.from(select.options).forEach(opt=>{
         if (opt.value == id){
