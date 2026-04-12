@@ -1,43 +1,57 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, redirect, session, jsonify
 import sqlite3
 import requests
 
 app = Flask(__name__)
-app.secret_key = "segredo"
+app.secret_key = "segredo_super_seguro"
 
 GESTORES = ["gestor@email.com"]
 
 def conectar():
     return sqlite3.connect("database.db")
 
-# ---------------- LOGIN ----------------
-@app.route("/", methods=["GET", "POST"])
-def index():
+# ---------------- LOGIN AUTOMÁTICO (MOODLE) ----------------
+@app.route("/", methods=["GET"])
+def auto_login():
+    nome = request.args.get("nome")
+    email = request.args.get("email")
+
+    if nome and email:
+        session["nome"] = nome
+        session["email"] = email
+        session["tipo"] = "gestor" if email in GESTORES else "formador"
+        return redirect("/funcao")
+
+    return render_template("login.html")
+
+# ---------------- ESCOLHA DE FUNÇÃO ----------------
+@app.route("/funcao", methods=["GET", "POST"])
+def funcao():
     if request.method == "POST":
-        nome = request.form.get("nome")
-        email = request.form.get("email")
         funcao = request.form.get("funcao")
 
         conn = conectar()
         cur = conn.cursor()
 
-        tipo = "gestor" if email in GESTORES else "formador"
-
         cur.execute("""
         INSERT INTO usuarios (nome, email, tipo, funcao)
         VALUES (?, ?, ?, ?)
-        """, (nome, email, tipo, funcao))
+        """, (
+            session.get("nome"),
+            session.get("email"),
+            session.get("tipo"),
+            funcao
+        ))
 
-        usuario_id = cur.lastrowid
+        user_id = cur.lastrowid
 
         cur.execute("INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
-                    (usuario_id, "login"))
+                    (user_id, "login"))
 
         conn.commit()
         conn.close()
 
-        session["usuario_id"] = usuario_id
-        session["tipo"] = tipo
+        session["user_id"] = user_id
         session["funcao"] = funcao
 
         if funcao != "Formador Regional":
@@ -45,24 +59,26 @@ def index():
 
         return redirect("/formulario")
 
-    return render_template("login.html")
+    return render_template("funcao.html")
 
 # ---------------- IBGE ----------------
 @app.route("/estados")
 def estados():
-    url = "https://servicodados.ibge.gov.br/api/v1/localidades/estados"
-    return requests.get(url).json()
+    return jsonify(requests.get(
+        "https://servicodados.ibge.gov.br/api/v1/localidades/estados"
+    ).json())
 
 @app.route("/municipios/<uf>")
 def municipios(uf):
-    url = f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
-    return requests.get(url).json()
+    return jsonify(requests.get(
+        f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
+    ).json())
 
 # ---------------- FORMULÁRIO ----------------
 @app.route("/formulario")
 def formulario():
     if session.get("funcao") != "Formador Regional":
-        return "Acesso não autorizado"
+        return "Acesso negado"
     return render_template("formulario.html")
 
 # ---------------- SALVAR ----------------
@@ -71,7 +87,8 @@ def salvar():
     conn = conectar()
     cur = conn.cursor()
 
-    usuario_id = session["usuario_id"]
+    usuario = session["user_id"]
+    estado = request.form["estado"]
 
     municipios = request.form.getlist("municipios")
 
@@ -84,24 +101,19 @@ def salvar():
             eja_alfabetizacao, eja_alfabetizacao_qtd,
             eja_anos_iniciais, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
-            usuario_id,
+            usuario,
             m,
             request.form.get(f"nome_{m}"),
-            request.form.get("estado"),
-
+            estado,
             request.form.get(f"formador_local_{m}"),
-
             request.form.get(f"pba_{m}"),
             request.form.get(f"pba_qtd_{m}") or 0,
-
             request.form.get(f"eja_alf_{m}"),
             request.form.get(f"eja_alf_qtd_{m}") or 0,
-
             request.form.get(f"eja_ai_{m}"),
             request.form.get(f"eja_ai_qtd_{m}") or 0,
-
             request.form.get(f"jan_{m}") or 0,
             request.form.get(f"fev_{m}") or 0,
             request.form.get(f"mar_{m}") or 0,
@@ -116,7 +128,7 @@ def salvar():
     conn.commit()
     conn.close()
 
-    return "Dados salvos com sucesso!"
+    return "Dados enviados com sucesso!"
 
 # ---------------- DASHBOARD ----------------
 @app.route("/dashboard")
@@ -127,53 +139,32 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
-    # Indicadores
-    cur.execute("SELECT COUNT(*) FROM usuarios")
-    total_usuarios = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM usuarios WHERE funcao='Formador Regional'")
-    total_formadores = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM usuarios WHERE funcao!='Formador Regional'")
-    outros = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(DISTINCT municipio_id) FROM respostas")
-    municipios = cur.fetchone()[0]
-
-    cur.execute("SELECT SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm) FROM respostas")
-    participantes = cur.fetchone()[0] or 0
-
-    # Participantes por estado
-    cur.execute("""
-    SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
-    FROM respostas
-    GROUP BY estado
-    """)
+    cur.execute("SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm) FROM respostas GROUP BY estado")
     dados_estado = cur.fetchall()
 
-    # Participantes por mês
+    cur.execute("SELECT funcao, COUNT(*) FROM usuarios GROUP BY funcao")
+    funcoes = cur.fetchall()
+
     cur.execute("""
-    SELECT SUM(jan), SUM(fev), SUM(mar), SUM(abr),
-           SUM(mai), SUM(jun), SUM(jul), SUM(ago), SUM(setm)
+    SELECT SUM(jan),SUM(fev),SUM(mar),SUM(abr),
+           SUM(mai),SUM(jun),SUM(jul),SUM(ago),SUM(setm)
     FROM respostas
     """)
     meses = cur.fetchone()
 
-    # Funções
-    cur.execute("SELECT funcao, COUNT(*) FROM usuarios GROUP BY funcao")
-    funcoes = cur.fetchall()
-
     conn.close()
 
     return render_template("dashboard.html",
-        total_usuarios=total_usuarios,
-        total_formadores=total_formadores,
-        outros=outros,
-        municipios=municipios,
-        participantes=participantes,
         dados_estado=dados_estado,
-        meses=meses,
-        funcoes=funcoes
+        funcoes=funcoes,
+        meses=meses
     )
+
+# ---------------- PERMITIR EMBED NO MOODLE ----------------
+@app.after_request
+def after_request(response):
+    response.headers['X-Frame-Options'] = 'ALLOWALL'
+    return response
+
 if __name__ == "__main__":
     app.run()
