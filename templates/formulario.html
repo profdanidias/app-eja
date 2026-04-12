@@ -226,7 +226,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             <option value="não">Não</option>
             <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
+            Se sim, quantas turmas? <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
 
             Há turma de Alfabetização da EJA?
             <select name="eja_alf_${id}" onchange="controlarQuantidade(this,'eja_alf_qtd_${id}')">
@@ -235,7 +235,7 @@ document.getElementById("municipios").addEventListener("change", function(){
             <option value="não">Não</option>
             <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
+            Se sim, quantas turmas? <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
 
             Há turma de EJA (Anos Iniciais do Ensino Fundamental):
             <select name="eja_ai_${id}" onchange="controlarQuantidade(this,'eja_ai_qtd_${id}')">
@@ -244,9 +244,9 @@ document.getElementById("municipios").addEventListener("change", function(){
             <option value="não">Não</option>
             <option value="não sei">Não sei</option>
             </select>
-            Quantidade: <input id="eja_ai_qtd_${id}" type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
+            Se sim, quantas turmas? <input id="eja_ai_qtd_${id}" type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
 
-            <b>Formação presencial (quantidade de participantes por mês)</b><br><br>
+            <b>Formação presencial (Quantidade de participantes por mês | PBA + Escolas)</b><br><br>
 
             ${campoMes("Jan","jan",id,1)}
             ${campoMes("Fev","fev",id,2)}
