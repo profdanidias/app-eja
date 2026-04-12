@@ -10,7 +10,7 @@
 
 <div class="container">
 
-    <!-- AVISO INSTITUCIONAL -->
+    <!-- AVISO -->
     <div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px;">
         <b>Atenção:</b> O preenchimento deste formulário substitui automaticamente qualquer envio anterior realizado por este usuário.
         <br>
@@ -55,14 +55,13 @@
 
 <script>
 
-// ================= VALIDAÇÃO GLOBAL =================
+// ================= VALIDAÇÃO =================
 function validarNumero(valor) {
     if (valor === "") return true;
     return /^[0-9]+$/.test(valor);
 }
 
 function validarFormulario() {
-
     let inputs = document.querySelectorAll('input[type="number"]');
 
     for (let input of inputs) {
@@ -125,7 +124,7 @@ document.getElementById("estado").addEventListener("change", function(){
 
 });
 
-// ================= BLOQUEIO DE MESES FUTUROS =================
+// ================= MESES =================
 const mesAtual = new Date().getMonth() + 1;
 
 function campoMes(label, nome, id, numeroMes){
@@ -151,9 +150,16 @@ document.getElementById("municipios").addEventListener("change", function(){
             let nome = opt.text;
 
             let div = document.createElement("div");
+            div.setAttribute("id", "bloco_" + id);
 
             div.innerHTML = `
             <h3>${nome}</h3>
+
+            <button type="button" onclick="removerMunicipio('${id}')">
+                RETIRAR MUNICÍPIO
+            </button>
+
+            <br><br>
 
             <input type="hidden" name="nome_${id}" value="${nome}">
 
@@ -208,6 +214,26 @@ document.getElementById("municipios").addEventListener("change", function(){
     });
 
 });
+
+// ================= REMOVER MUNICÍPIO =================
+function removerMunicipio(id){
+
+    // remove bloco visual
+    let bloco = document.getElementById("bloco_" + id);
+    if (bloco) bloco.remove();
+
+    // remove da lista de selecionados
+    selecionados.delete(id);
+
+    // desmarca no select
+    let select = document.getElementById("municipios");
+    Array.from(select.options).forEach(opt=>{
+        if (opt.value == id){
+            opt.selected = false;
+        }
+    });
+
+}
 </script>
 
 </body>
