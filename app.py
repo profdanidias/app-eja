@@ -8,6 +8,7 @@ app.secret_key = "segredo_super_seguro"
 # ================= CONFIG =================
 GESTORES = ["professoradanidias@gmail.com"]
 
+
 def conectar():
     return sqlite3.connect("database.db")
 
@@ -21,15 +22,26 @@ def auto_login():
     if nome and email:
         session["nome"] = nome.strip()
         session["email"] = email.strip().lower()
-        session["tipo"] = "gestor" if session["email"] in GESTORES else "formador"
+
+        # define tipo corretamente
+        if session["email"] in GESTORES:
+            session["tipo"] = "gestor"
+        else:
+            session["tipo"] = "formador"
+
         return redirect("/funcao")
 
-    return "Acesso inválido"
+    return "Acesso inválido. Utilize o acesso via Moodle."
 
 
 # ================= FUNÇÃO =================
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
+
+    # PROTEÇÃO: evita erro de sessão vazia
+    if "email" not in session:
+        return redirect("/")
+
     if request.method == "POST":
         funcao = request.form.get("funcao")
 
@@ -83,6 +95,10 @@ def municipios(uf):
 # ================= FORMULÁRIO =================
 @app.route("/formulario")
 def formulario():
+
+    if "email" not in session:
+        return redirect("/")
+
     if session.get("funcao") != "Formador Regional":
         return "Acesso negado"
 
@@ -95,11 +111,14 @@ def formulario():
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
+    if "user_id" not in session:
+        return redirect("/")
+
     conn = conectar()
     cur = conn.cursor()
 
     usuario = session["user_id"]
-    estado = request.form["estado"]
+    estado = request.form.get("estado")
     municipios = request.form.getlist("municipios")
 
     for m in municipios:
@@ -120,37 +139,42 @@ def salvar():
             estado,
             request.form.get(f"formador_local_{m}"),
             request.form.get(f"pba_{m}"),
-            request.form.get(f"pba_qtd_{m}") or 0,
+            int(request.form.get(f"pba_qtd_{m}") or 0),
             request.form.get(f"eja_alf_{m}"),
-            request.form.get(f"eja_alf_qtd_{m}") or 0,
+            int(request.form.get(f"eja_alf_qtd_{m}") or 0),
             request.form.get(f"eja_ai_{m}"),
-            request.form.get(f"eja_ai_qtd_{m}") or 0,
-            request.form.get(f"jan_{m}") or 0,
-            request.form.get(f"fev_{m}") or 0,
-            request.form.get(f"mar_{m}") or 0,
-            request.form.get(f"abr_{m}") or 0,
-            request.form.get(f"mai_{m}") or 0,
-            request.form.get(f"jun_{m}") or 0,
-            request.form.get(f"jul_{m}") or 0,
-            request.form.get(f"ago_{m}") or 0,
-            request.form.get(f"setm_{m}") or 0
+            int(request.form.get(f"eja_ai_qtd_{m}") or 0),
+            int(request.form.get(f"jan_{m}") or 0),
+            int(request.form.get(f"fev_{m}") or 0),
+            int(request.form.get(f"mar_{m}") or 0),
+            int(request.form.get(f"abr_{m}") or 0),
+            int(request.form.get(f"mai_{m}") or 0),
+            int(request.form.get(f"jun_{m}") or 0),
+            int(request.form.get(f"jul_{m}") or 0),
+            int(request.form.get(f"ago_{m}") or 0),
+            int(request.form.get(f"setm_{m}") or 0)
         ))
 
     conn.commit()
     conn.close()
 
-    return "Dados enviados com sucesso!"
+    return "<h3>Dados enviados com sucesso!</h3><a href='/formulario'>Voltar</a>"
 
 
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
+
+    if "email" not in session:
+        return redirect("/")
+
     if session.get("tipo") != "gestor":
         return "Acesso negado"
 
     conn = conectar()
     cur = conn.cursor()
 
+    # total por estado
     cur.execute("""
     SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
     FROM respostas
@@ -158,6 +182,7 @@ def dashboard():
     """)
     dados_estado = cur.fetchall()
 
+    # funções acessadas
     cur.execute("""
     SELECT funcao, COUNT(*)
     FROM usuarios
@@ -165,28 +190,32 @@ def dashboard():
     """)
     funcoes = cur.fetchall()
 
+    # total por mês
     cur.execute("""
-    SELECT SUM(jan),SUM(fev),SUM(mar),SUM(abr),
-           SUM(mai),SUM(jun),SUM(jul),SUM(ago),SUM(setm)
+    SELECT 
+        SUM(jan), SUM(fev), SUM(mar), SUM(abr),
+        SUM(mai), SUM(jun), SUM(jul), SUM(ago), SUM(setm)
     FROM respostas
     """)
     meses = cur.fetchone()
 
     conn.close()
 
-    return render_template("dashboard.html",
+    return render_template(
+        "dashboard.html",
         dados_estado=dados_estado,
         funcoes=funcoes,
         meses=meses
     )
 
 
-# ================= EMBED MOODLE =================
+# ================= EMBED (MOODLE) =================
 @app.after_request
 def after_request(response):
-    response.headers['X-Frame-Options'] = 'ALLOWALL'
+    response.headers["X-Frame-Options"] = "ALLOWALL"
     return response
 
 
+# ================= RUN =================
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
