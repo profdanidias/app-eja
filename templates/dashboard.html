@@ -4,89 +4,60 @@
 <meta charset="UTF-8">
 <title>Dashboard EJA</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:20px; }
 .card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
-.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-select,input { padding:6px; }
 </style>
-
 </head>
+
 <body>
 
-<h2>Painel EJA</h2>
+<h2>Painel Nacional EJA</h2>
 
 <div class="card">
-<h3>Filtros</h3>
-
-<div class="grid">
-<select id="estado"><option value="">Estado</option></select>
-<select id="municipio"><option value="">Município</option></select>
-<select id="formador"><option value="">Formador</option></select>
-
-<select id="formadorLocal">
-<option value="">Formador Local</option>
-<option value="sim">Sim</option>
-<option value="não">Não</option>
-<option value="não identificado">Não identificado</option>
-</select>
-
-<input id="pba" type="number" placeholder="PBA ≥">
-<input id="ejaalf" type="number" placeholder="EJA Alf ≥">
-<input id="ejaai" type="number" placeholder="EJA AI ≥">
-<input id="total" type="number" placeholder="Participantes ≥">
-</div>
-
-<button onclick="filtrar()">Aplicar</button>
-<button onclick="limpar()">Limpar</button>
-
+<canvas id="mapa"></canvas>
+<p id="infoEstado"></p>
 </div>
 
 <div class="card">
-<h3>Resultados</h3>
 <table border="1" width="100%" id="tabela"></table>
 </div>
 
 <script>
 
 const dados = {{ dados | tojson }};
+let dadosFiltrados = [...dados];
 
-// preencher filtros
-function preencher(id, campo){
-    let set = new Set(dados.map(d=>d[campo]));
-    let el = document.getElementById(id);
-    set.forEach(v=>{
-        if(v) el.innerHTML += `<option value="${v}">${v}</option>`;
+// ================= AGRUPAR POR ESTADO =================
+function totalPorEstado(){
+    let mapa = {};
+    dados.forEach(d=>{
+        mapa[d.estado] = (mapa[d.estado] || 0) + d.total;
     });
+    return mapa;
 }
 
-preencher("estado","estado");
-preencher("municipio","municipio");
-preencher("formador","formador");
-
-// render
+// ================= TABELA =================
 function render(lista){
     let t = document.getElementById("tabela");
 
-    t.innerHTML = `
-    <tr>
-    <th>Município</th>
-    <th>Estado</th>
-    <th>Formador</th>
-    <th>PBA</th>
-    <th>EJA Alf</th>
-    <th>EJA AI</th>
-    <th>Total</th>
-    </tr>`;
+    if(lista.length === 0){
+        t.innerHTML = "<tr><td>Dados não enviados</td></tr>";
+        return;
+    }
+
+    t.innerHTML = "<tr><th>Município</th><th>Estado</th><th>Formador</th><th>Data</th><th>Total</th></tr>";
 
     lista.forEach(d=>{
         t.innerHTML += `<tr>
         <td>${d.municipio}</td>
         <td>${d.estado}</td>
         <td>${d.formador}</td>
-        <td>${d.pba}</td>
-        <td>${d.eja_alf}</td>
-        <td>${d.eja_ai}</td>
+        <td>${d.data}</td>
         <td>${d.total}</td>
         </tr>`;
     });
@@ -94,26 +65,50 @@ function render(lista){
 
 render(dados);
 
-// filtro
-function filtrar(){
+// ================= MAPA REAL =================
+(async () => {
 
-    let lista = dados.filter(d=>{
-        return (!estado.value || d.estado==estado.value)
-        && (!municipio.value || d.municipio==municipio.value)
-        && (!formador.value || d.formador==formador.value)
-        && (!formadorLocal.value || d.formador_local==formadorLocal.value)
-        && (d.pba >= (pba.value || 0))
-        && (d.eja_alf >= (ejaalf.value || 0))
-        && (d.eja_ai >= (ejaai.value || 0))
-        && (d.total >= (total.value || 0));
-    });
+const res = await fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson");
+const geo = await res.json();
 
-    render(lista);
-}
+const totais = totalPorEstado();
 
-function limpar(){
-    location.reload();
-}
+const features = geo.features.map(f=>{
+    let nome = f.properties.name;
+    let valor = totais[nome] || 0;
+    return {feature: f, value: valor};
+});
+
+new Chart(document.getElementById("mapa"), {
+    type: "choropleth",
+    data: {
+        labels: geo.features.map(f=>f.properties.name),
+        datasets: [{
+            label: "Participantes",
+            data: features
+        }]
+    },
+    options: {
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: ctx => ctx.raw.feature.properties.name
+                }
+            }
+        },
+        onClick: (evt, elements, chart) => {
+            if(elements.length){
+                let estado = chart.data.labels[elements[0].index];
+                document.getElementById("infoEstado").innerText = "Estado: " + estado;
+
+                dadosFiltrados = dados.filter(d=>d.estado === estado);
+                render(dadosFiltrados);
+            }
+        }
+    }
+});
+
+})();
 
 </script>
 

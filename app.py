@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, redirect, session, jsonify, send_file
 import sqlite3
 import requests
-import os
+import pandas as pd
+import io
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
@@ -33,7 +35,8 @@ def criar_banco():
         eja_anos_iniciais TEXT,
         eja_anos_iniciais_qtd INTEGER,
         jan INTEGER, fev INTEGER, mar INTEGER, abr INTEGER,
-        mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER
+        mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER,
+        data_envio TEXT
     )
     """)
 
@@ -41,7 +44,6 @@ def criar_banco():
     conn.close()
 
 
-# cria automaticamente ao iniciar
 criar_banco()
 
 
@@ -59,13 +61,8 @@ def auto_login():
     return "Acesso inválido"
 
 
-# ================= FUNÇÃO =================
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
-
-    if "email" not in session:
-        return redirect("/")
-
     if request.method == "POST":
         session["funcao"] = request.form.get("funcao")
 
@@ -77,15 +74,9 @@ def funcao():
     return render_template("funcao.html")
 
 
-# ================= FORMULÁRIO =================
 @app.route("/formulario")
 def formulario():
-
-    if session.get("funcao") != "Formador Regional":
-        return "Acesso negado"
-
     is_gestor = session.get("email") in GESTORES
-
     return render_template("formulario.html", is_gestor=is_gestor)
 
 
@@ -108,105 +99,95 @@ def municipios(uf):
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
-    try:
-        conn = conectar()
-        cur = conn.cursor()
+    conn = conectar()
+    cur = conn.cursor()
 
-        usuario = session.get("nome")
-        estado = request.form.get("estado")
-        municipios = request.form.getlist("municipios")
+    usuario = session.get("nome")
+    estado = request.form.get("estado")
+    municipios = request.form.getlist("municipios")
+    data_envio = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-        for m in municipios:
-            cur.execute("""
-            INSERT INTO respostas (
-                usuario_id, municipio_id, municipio_nome, estado,
-                formador_local,
-                pba, pba_qtd,
-                eja_alfabetizacao, eja_alfabetizacao_qtd,
-                eja_anos_iniciais, eja_anos_iniciais_qtd,
-                jan, fev, mar, abr, mai, jun, jul, ago, setm
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (
-                usuario,
-                m,
-                request.form.get(f"nome_{m}") or "",
-                estado,
-                request.form.get(f"formador_local_{m}") or "",
-                request.form.get(f"pba_{m}") or "",
-                int(request.form.get(f"pba_qtd_{m}") or 0),
-                request.form.get(f"eja_alf_{m}") or "",
-                int(request.form.get(f"eja_alf_qtd_{m}") or 0),
-                request.form.get(f"eja_ai_{m}") or "",
-                int(request.form.get(f"eja_ai_qtd_{m}") or 0),
-                int(request.form.get(f"jan_{m}") or 0),
-                int(request.form.get(f"fev_{m}") or 0),
-                int(request.form.get(f"mar_{m}") or 0),
-                int(request.form.get(f"abr_{m}") or 0),
-                int(request.form.get(f"mai_{m}") or 0),
-                int(request.form.get(f"jun_{m}") or 0),
-                int(request.form.get(f"jul_{m}") or 0),
-                int(request.form.get(f"ago_{m}") or 0),
-                int(request.form.get(f"setm_{m}") or 0)
-            ))
+    for m in municipios:
+        cur.execute("""
+        INSERT INTO respostas (
+            usuario_id, municipio_id, municipio_nome, estado,
+            formador_local,
+            pba, pba_qtd,
+            eja_alfabetizacao, eja_alfabetizacao_qtd,
+            eja_anos_iniciais, eja_anos_iniciais_qtd,
+            jan, fev, mar, abr, mai, jun, jul, ago, setm,
+            data_envio
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            usuario,
+            m,
+            request.form.get(f"nome_{m}") or "",
+            estado,
+            request.form.get(f"formador_local_{m}") or "",
+            request.form.get(f"pba_{m}") or "",
+            int(request.form.get(f"pba_qtd_{m}") or 0),
+            request.form.get(f"eja_alf_{m}") or "",
+            int(request.form.get(f"eja_alf_qtd_{m}") or 0),
+            request.form.get(f"eja_ai_{m}") or "",
+            int(request.form.get(f"eja_ai_qtd_{m}") or 0),
+            int(request.form.get(f"jan_{m}") or 0),
+            int(request.form.get(f"fev_{m}") or 0),
+            int(request.form.get(f"mar_{m}") or 0),
+            int(request.form.get(f"abr_{m}") or 0),
+            int(request.form.get(f"mai_{m}") or 0),
+            int(request.form.get(f"jun_{m}") or 0),
+            int(request.form.get(f"jul_{m}") or 0),
+            int(request.form.get(f"ago_{m}") or 0),
+            int(request.form.get(f"setm_{m}") or 0),
+            data_envio
+        ))
 
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
-        return "<h3>Dados salvos com sucesso!</h3><a href='/formulario'>Voltar</a>"
-
-    except Exception as e:
-        return f"<h3>Erro ao salvar:</h3><pre>{str(e)}</pre>"
+    return "<h3>Dados salvos com sucesso!</h3><a href='/formulario'>Voltar</a>"
 
 
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
 
-    try:
-        if session.get("email") not in GESTORES:
-            return "Acesso negado"
+    if session.get("email") not in GESTORES:
+        return "Acesso negado"
 
-        conn = conectar()
-        cur = conn.cursor()
+    conn = conectar()
+    cur = conn.cursor()
 
-        cur.execute("""
-        SELECT 
-            usuario_id,
-            municipio_nome,
-            estado,
-            formador_local,
-            pba_qtd,
-            eja_alfabetizacao_qtd,
-            eja_anos_iniciais_qtd,
-            COALESCE(jan,0)+COALESCE(fev,0)+COALESCE(mar,0)+COALESCE(abr,0)+
-            COALESCE(mai,0)+COALESCE(jun,0)+COALESCE(jul,0)+COALESCE(ago,0)+COALESCE(setm,0)
-            as total
-        FROM respostas
-        """)
+    cur.execute("""
+    SELECT 
+        usuario_id, municipio_nome, estado, formador_local,
+        pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+        COALESCE(jan,0)+COALESCE(fev,0)+COALESCE(mar,0)+COALESCE(abr,0)+
+        COALESCE(mai,0)+COALESCE(jun,0)+COALESCE(jul,0)+COALESCE(ago,0)+COALESCE(setm,0),
+        data_envio
+    FROM respostas
+    """)
 
-        rows = cur.fetchall()
-        conn.close()
+    rows = cur.fetchall()
+    conn.close()
 
-        dados = []
-        for r in rows:
-            dados.append({
-                "formador": r[0],
-                "municipio": r[1],
-                "estado": r[2],
-                "formador_local": r[3],
-                "pba": r[4] or 0,
-                "eja_alf": r[5] or 0,
-                "eja_ai": r[6] or 0,
-                "total": r[7] or 0
-            })
+    dados = []
+    for r in rows:
+        dados.append({
+            "formador": r[0],
+            "municipio": r[1],
+            "estado": r[2],
+            "formador_local": r[3],
+            "pba": r[4] or 0,
+            "eja_alf": r[5] or 0,
+            "eja_ai": r[6] or 0,
+            "total": r[7] or 0,
+            "data": r[8]
+        })
 
-        return render_template("dashboard.html", dados=dados)
-
-    except Exception as e:
-        return f"<h3>Erro no dashboard:</h3><pre>{str(e)}</pre>"
+    return render_template("dashboard.html", dados=dados)
 
 
-# ================= PERMITIR EMBED =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
