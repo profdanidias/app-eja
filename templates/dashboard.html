@@ -2,135 +2,100 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Dashboard</title>
+<title>Dashboard EJA</title>
 
-<script src="https://www.gstatic.com/charts/loader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body { font-family: Arial; background:#f5f7fa; padding:20px; }
-select, button { padding:10px; margin:10px 0; }
-
-#mapa { height:500px; }
-
-table { width:100%; background:white; border-collapse: collapse; }
-th, td { padding:10px; border-bottom:1px solid #ddd; }
-
-.alerta { color:red; font-weight:bold; }
+body {
+    font-family: Arial;
+    background:#f4f6f9;
+    margin:20px;
+}
+.card {
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    margin-bottom:20px;
+}
 </style>
-</head>
 
+</head>
 <body>
 
-<h1>Dashboard EJA</h1>
+<h2>Painel de Monitoramento EJA</h2>
 
-<!-- FILTRO -->
-<select id="estadoFiltro">
-<option value="">Selecione o Estado</option>
-</select>
+<div class="card">
+<h3>Participação por Estado</h3>
+<canvas id="graficoEstado"></canvas>
+</div>
 
-<div id="alerta" class="alerta"></div>
+<div class="card">
+<h3>Participação por Região</h3>
+<canvas id="graficoRegiao"></canvas>
+</div>
 
-<button onclick="exportar()">Exportar Excel</button>
+<div class="card">
+<h3>Top 5 Municípios</h3>
+<ul id="topMunicipios"></ul>
+</div>
 
-<form action="/importar" method="post" enctype="multipart/form-data">
-<input type="file" name="file">
-<button type="submit">Importar Excel</button>
-</form>
-
-<div id="mapa"></div>
-
+<div class="card">
 <h3>Municípios</h3>
-<table>
-<thead>
+<table border="1" width="100%">
 <tr>
 <th>Município</th>
 <th>Estado</th>
 <th>Formador</th>
 <th>Total</th>
 </tr>
-</thead>
-<tbody id="tabela"></tbody>
+
+{% for m in dados_municipio %}
+<tr>
+<td>{{m[0]}}</td>
+<td>{{m[1]}}</td>
+<td>{{m[2]}}</td>
+<td>{{m[3]}}</td>
+</tr>
+{% endfor %}
+
 </table>
+</div>
 
 <script>
 
 const estados = {{ dados_estado | tojson }};
-const municipios = {{ dados_municipio | tojson }};
+const regioes = {{ dados_regiao | tojson }};
+const topMunicipios = {{ top_municipios | tojson }};
 
-const select = document.getElementById("estadoFiltro");
-
-// preencher dropdown
-estados.forEach(e=>{
-    let opt = document.createElement("option");
-    opt.value = e[0];
-    opt.text = e[0];
-    select.appendChild(opt);
+// ESTADOS
+new Chart(document.getElementById("graficoEstado"), {
+    type: "bar",
+    data: {
+        labels: estados.map(e => e[0]),
+        datasets: [{
+            data: estados.map(e => e[1])
+        }]
+    }
 });
 
-google.charts.load('current', {'packages':['geochart']});
-
-function desenharMapa(dados){
-    const data = new google.visualization.DataTable();
-    data.addColumn('string','Estado');
-    data.addColumn('number','Total');
-
-    dados.forEach(e=>{
-        data.addRow(['BR-'+e[0], e[1]]);
-    });
-
-    const chart = new google.visualization.GeoChart(document.getElementById('mapa'));
-
-    google.visualization.events.addListener(chart, 'select', function(){
-        let sel = chart.getSelection();
-        if(sel.length){
-            let estado = data.getValue(sel[0].row,0).replace('BR-','');
-            select.value = estado;
-            atualizar();
-        }
-    });
-
-    chart.draw(data, {region:'BR', resolution:'provinces'});
-}
-
-function atualizar(){
-
-    let estado = select.value;
-
-    let filtrado = municipios;
-
-    if(estado){
-        filtrado = municipios.filter(m=>m[1]===estado);
+// REGIÕES
+new Chart(document.getElementById("graficoRegiao"), {
+    type: "pie",
+    data: {
+        labels: Object.keys(regioes),
+        datasets: [{
+            data: Object.values(regioes)
+        }]
     }
+});
 
-    if(filtrado.length===0){
-        document.getElementById("alerta").innerText = "Dados não enviados";
-    } else {
-        document.getElementById("alerta").innerText = "";
-    }
+// TOP MUNICÍPIOS
+const lista = document.getElementById("topMunicipios");
 
-    let tabela = document.getElementById("tabela");
-    tabela.innerHTML="";
-
-    filtrado.forEach(m=>{
-        tabela.innerHTML += `
-        <tr>
-        <td>${m[0]}</td>
-        <td>${m[1]}</td>
-        <td>${m[2]}</td>
-        <td>${m[3]}</td>
-        </tr>`;
-    });
-
-    desenharMapa(estados);
-}
-
-function exportar(){
-    window.location.href="/exportar";
-}
-
-select.addEventListener("change", atualizar);
-
-google.charts.setOnLoadCallback(atualizar);
+topMunicipios.forEach(m => {
+    lista.innerHTML += `<li><b>${m[0]}</b> (${m[1]}) - ${m[3]}</li>`;
+});
 
 </script>
 

@@ -15,7 +15,7 @@ def conectar():
     return sqlite3.connect("database.db")
 
 
-# ================= CRIAR BANCO AUTOMÁTICO =================
+# ================= CRIAR BANCO =================
 def inicializar_banco():
     conn = conectar()
     cur = conn.cursor()
@@ -43,7 +43,6 @@ def inicializar_banco():
     conn.close()
 
 
-# 🔥 GARANTE QUE O BANCO SEMPRE EXISTE
 inicializar_banco()
 
 
@@ -164,38 +163,6 @@ def salvar():
     return "<h3>Dados enviados com sucesso!</h3><a href='/formulario'>Voltar</a>"
 
 
-# ================= EXPORTAR =================
-@app.route("/exportar")
-def exportar():
-
-    conn = conectar()
-    df = pd.read_sql_query("SELECT * FROM respostas", conn)
-    conn.close()
-
-    output = io.BytesIO()
-    df.to_excel(output, index=False)
-    output.seek(0)
-
-    return send_file(output,
-        download_name="dados_eja.xlsx",
-        as_attachment=True
-    )
-
-
-# ================= IMPORTAR =================
-@app.route("/importar", methods=["POST"])
-def importar():
-
-    arquivo = request.files["file"]
-    df = pd.read_excel(arquivo)
-
-    conn = conectar()
-    df.to_sql("respostas", conn, if_exists="append", index=False)
-    conn.close()
-
-    return redirect("/dashboard")
-
-
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
@@ -216,24 +183,39 @@ def dashboard():
 
     # MUNICÍPIOS
     cur.execute("""
-    SELECT municipio_nome, estado,
+    SELECT municipio_nome, estado, usuario_id,
            COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
     FROM respostas
     GROUP BY municipio_nome, estado
-    ORDER BY 3 DESC
+    ORDER BY 4 DESC
     """)
-    dados_municipio_raw = cur.fetchall() or []
-
-    # adiciona nome do formador
-    dados_municipio = []
-    for m in dados_municipio_raw:
-        dados_municipio.append((m[0], m[1], "Formador", m[2]))
+    dados_municipio = cur.fetchall() or []
 
     conn.close()
 
+    # REGIÕES
+    regioes = {
+        "AC":"Norte","AP":"Norte","AM":"Norte","PA":"Norte","RO":"Norte","RR":"Norte","TO":"Norte",
+        "AL":"Nordeste","BA":"Nordeste","CE":"Nordeste","MA":"Nordeste","PB":"Nordeste",
+        "PE":"Nordeste","PI":"Nordeste","RN":"Nordeste","SE":"Nordeste",
+        "DF":"Centro-Oeste","GO":"Centro-Oeste","MT":"Centro-Oeste","MS":"Centro-Oeste",
+        "ES":"Sudeste","MG":"Sudeste","RJ":"Sudeste","SP":"Sudeste",
+        "PR":"Sul","RS":"Sul","SC":"Sul"
+    }
+
+    dados_regiao = {}
+
+    for estado, total in dados_estado:
+        regiao = regioes.get(estado, "Outros")
+        dados_regiao[regiao] = dados_regiao.get(regiao, 0) + total
+
+    top_municipios = sorted(dados_municipio, key=lambda x: x[3], reverse=True)[:5]
+
     return render_template("dashboard.html",
         dados_estado=dados_estado,
-        dados_municipio=dados_municipio
+        dados_municipio=dados_municipio,
+        dados_regiao=dados_regiao,
+        top_municipios=top_municipios
     )
 
 
