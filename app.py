@@ -5,19 +5,18 @@ import requests
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
 
-# ================= CONFIG =================
 GESTORES = ["professoradanidias@gmail.com"]
+
 
 def conectar():
     return sqlite3.connect("database.db")
 
 
-# ================= CRIAR BANCO AUTOMATICAMENTE =================
+# ================= BANCO =================
 def inicializar_banco():
     conn = conectar()
     cur = conn.cursor()
 
-    # tabela usuarios
     cur.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,17 +27,6 @@ def inicializar_banco():
     )
     """)
 
-    # tabela logs
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS logs_acesso (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario_id INTEGER,
-        acao TEXT,
-        data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    # tabela respostas
     cur.execute("""
     CREATE TABLE IF NOT EXISTS respostas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,23 +50,22 @@ def inicializar_banco():
     conn.close()
 
 
-# executa ao iniciar
 inicializar_banco()
 
 
 # ================= LOGIN =================
-@app.route("/", methods=["GET"])
+@app.route("/")
 def auto_login():
     nome = request.args.get("nome")
     email = request.args.get("email")
 
     if nome and email:
-        session["nome"] = nome.strip()
-        session["email"] = email.strip().lower()
-        session["tipo"] = "gestor" if session["email"] in GESTORES else "formador"
+        session["nome"] = nome
+        session["email"] = email.lower()
+        session["tipo"] = "gestor" if email.lower() in GESTORES else "formador"
         return redirect("/funcao")
 
-    return "Acesso inválido. Utilize o acesso via Moodle."
+    return "Acesso inválido"
 
 
 # ================= FUNÇÃO =================
@@ -94,36 +81,19 @@ def funcao():
         conn = conectar()
         cur = conn.cursor()
 
-        # INSERÇÃO SEGURA
-        try:
-            cur.execute("""
-            INSERT INTO usuarios (nome, email, tipo, funcao)
-            VALUES (?, ?, ?, ?)
-            """, (
-                session.get("nome"),
-                session.get("email"),
-                session.get("tipo"),
-                funcao
-            ))
-        except Exception as e:
-            conn.close()
-            return f"Erro ao salvar usuário: {str(e)}"
-
-        user_id = cur.lastrowid
-
-        try:
-            cur.execute(
-                "INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
-                (user_id, "login")
-            )
-        except Exception as e:
-            conn.close()
-            return f"Erro ao registrar log: {str(e)}"
+        cur.execute("""
+        INSERT INTO usuarios (nome, email, tipo, funcao)
+        VALUES (?, ?, ?, ?)
+        """, (
+            session["nome"],
+            session["email"],
+            session["tipo"],
+            funcao
+        ))
 
         conn.commit()
         conn.close()
 
-        session["user_id"] = user_id
         session["funcao"] = funcao
 
         if funcao != "Formador Regional":
@@ -168,18 +138,17 @@ def formulario():
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
-    if "user_id" not in session:
+    if "email" not in session:
         return redirect("/")
 
     conn = conectar()
     cur = conn.cursor()
 
-    usuario = session["user_id"]
+    usuario = session.get("email")
     estado = request.form.get("estado")
     municipios = request.form.getlist("municipios")
 
     for m in municipios:
-
         cur.execute("""
         INSERT INTO respostas (
             usuario_id, municipio_id, municipio_nome, estado,
@@ -192,14 +161,14 @@ def salvar():
         """, (
             usuario,
             m,
-            request.form.get(f"nome_{m}"),
+            request.form.get(f"nome_{m}") or "",
             estado,
-            request.form.get(f"formador_local_{m}"),
-            request.form.get(f"pba_{m}"),
+            request.form.get(f"formador_local_{m}") or "",
+            request.form.get(f"pba_{m}") or "",
             int(request.form.get(f"pba_qtd_{m}") or 0),
-            request.form.get(f"eja_alf_{m}"),
+            request.form.get(f"eja_alf_{m}") or "",
             int(request.form.get(f"eja_alf_qtd_{m}") or 0),
-            request.form.get(f"eja_ai_{m}"),
+            request.form.get(f"eja_ai_{m}") or "",
             int(request.form.get(f"eja_ai_qtd_{m}") or 0),
             int(request.form.get(f"jan_{m}") or 0),
             int(request.form.get(f"fev_{m}") or 0),
@@ -225,45 +194,54 @@ def dashboard():
     if "email" not in session:
         return redirect("/")
 
-    if session.get("tipo") != "gestor":
+    if session.get("email") not in GESTORES:
         return "Acesso negado"
 
     conn = conectar()
     cur = conn.cursor()
 
+    # ESTADOS
     cur.execute("""
-    SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
+    SELECT estado, COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
     FROM respostas
     GROUP BY estado
     """)
     dados_estado = cur.fetchall()
 
+    # MUNICÍPIOS
     cur.execute("""
-    SELECT funcao, COUNT(*)
-    FROM usuarios
-    GROUP BY funcao
+    SELECT municipio_nome, estado,
+           COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
+    FROM respostas
+    GROUP BY municipio_nome, estado
+    ORDER BY 3 DESC
     """)
+    dados_municipio = cur.fetchall()
+
+    # FUNÇÕES
+    cur.execute("SELECT funcao, COUNT(*) FROM usuarios GROUP BY funcao")
     funcoes = cur.fetchall()
 
+    # MESES
     cur.execute("""
     SELECT 
-        SUM(jan), SUM(fev), SUM(mar), SUM(abr),
-        SUM(mai), SUM(jun), SUM(jul), SUM(ago), SUM(setm)
+        COALESCE(SUM(jan),0), COALESCE(SUM(fev),0), COALESCE(SUM(mar),0),
+        COALESCE(SUM(abr),0), COALESCE(SUM(mai),0), COALESCE(SUM(jun),0),
+        COALESCE(SUM(jul),0), COALESCE(SUM(ago),0), COALESCE(SUM(setm),0)
     FROM respostas
     """)
-    meses = cur.fetchone()
+    meses = cur.fetchone() or (0,0,0,0,0,0,0,0,0)
 
     conn.close()
 
-    return render_template(
-        "dashboard.html",
-        dados_estado=dados_estado,
-        funcoes=funcoes,
+    return render_template("dashboard.html",
+        dados_estado=dados_estado or [],
+        dados_municipio=dados_municipio or [],
+        funcoes=funcoes or [],
         meses=meses
     )
 
 
-# ================= EMBED =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
