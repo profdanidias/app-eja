@@ -18,9 +18,11 @@ body { font-family: Arial; background:#f4f6f9; margin:20px; }
 
 <h2>Painel Nacional EJA</h2>
 
+<button onclick="exportarExcel()">Exportar Excel</button>
+<button onclick="exportarPDF()">Exportar PDF</button>
+
 <div class="card">
 <canvas id="mapa"></canvas>
-<p id="infoEstado"></p>
 </div>
 
 <div class="card">
@@ -30,26 +32,10 @@ body { font-family: Arial; background:#f4f6f9; margin:20px; }
 <script>
 
 const dados = {{ dados | tojson }};
-let dadosFiltrados = [...dados];
 
-// ================= AGRUPAR POR ESTADO =================
-function totalPorEstado(){
-    let mapa = {};
-    dados.forEach(d=>{
-        mapa[d.estado] = (mapa[d.estado] || 0) + d.total;
-    });
-    return mapa;
-}
-
-// ================= TABELA =================
+// tabela
 function render(lista){
     let t = document.getElementById("tabela");
-
-    if(lista.length === 0){
-        t.innerHTML = "<tr><td>Dados não enviados</td></tr>";
-        return;
-    }
-
     t.innerHTML = "<tr><th>Município</th><th>Estado</th><th>Formador</th><th>Data</th><th>Total</th></tr>";
 
     lista.forEach(d=>{
@@ -65,50 +51,32 @@ function render(lista){
 
 render(dados);
 
-// ================= MAPA REAL =================
+// mapa real
 (async () => {
 
-const res = await fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson");
-const geo = await res.json();
-
-const totais = totalPorEstado();
-
-const features = geo.features.map(f=>{
-    let nome = f.properties.name;
-    let valor = totais[nome] || 0;
-    return {feature: f, value: valor};
-});
+const res = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json");
+const world = await res.json();
 
 new Chart(document.getElementById("mapa"), {
     type: "choropleth",
     data: {
-        labels: geo.features.map(f=>f.properties.name),
+        labels: ["Brasil"],
         datasets: [{
-            label: "Participantes",
-            data: features
+            label: "Mapa",
+            data: [{feature: topojson.feature(world, world.objects.countries).features.find(f=>f.properties.name==="Brazil"), value: 1}]
         }]
-    },
-    options: {
-        plugins: {
-            tooltip: {
-                callbacks: {
-                    label: ctx => ctx.raw.feature.properties.name
-                }
-            }
-        },
-        onClick: (evt, elements, chart) => {
-            if(elements.length){
-                let estado = chart.data.labels[elements[0].index];
-                document.getElementById("infoEstado").innerText = "Estado: " + estado;
-
-                dadosFiltrados = dados.filter(d=>d.estado === estado);
-                render(dadosFiltrados);
-            }
-        }
     }
 });
 
 })();
+
+function exportarExcel(){
+    window.location = "/exportar_excel";
+}
+
+function exportarPDF(){
+    window.location = "/exportar_pdf";
+}
 
 </script>
 
