@@ -10,8 +10,41 @@ app.secret_key = "segredo_super_seguro"
 GESTORES = ["professoradanidias@gmail.com"]
 
 
+# ================= CONEXÃO =================
 def conectar():
     return sqlite3.connect("database.db")
+
+
+# ================= CRIAR BANCO AUTOMÁTICO =================
+def inicializar_banco():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS respostas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id TEXT,
+        municipio_id TEXT,
+        municipio_nome TEXT,
+        estado TEXT,
+        formador_local TEXT,
+        pba TEXT,
+        pba_qtd INTEGER,
+        eja_alfabetizacao TEXT,
+        eja_alfabetizacao_qtd INTEGER,
+        eja_anos_iniciais TEXT,
+        eja_anos_iniciais_qtd INTEGER,
+        jan INTEGER, fev INTEGER, mar INTEGER, abr INTEGER,
+        mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# 🔥 GARANTE QUE O BANCO SEMPRE EXISTE
+inicializar_banco()
 
 
 # ================= LOGIN =================
@@ -23,6 +56,7 @@ def auto_login():
     if nome and email:
         session["nome"] = nome
         session["email"] = email.lower()
+        session["tipo"] = "gestor" if email.lower() in GESTORES else "formador"
         return redirect("/funcao")
 
     return "Acesso inválido"
@@ -31,6 +65,9 @@ def auto_login():
 # ================= FUNÇÃO =================
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
+
+    if "email" not in session:
+        return redirect("/")
 
     if request.method == "POST":
         funcao = request.form.get("funcao")
@@ -44,10 +81,18 @@ def funcao():
     return render_template("funcao.html")
 
 
-# ================= FORM =================
+# ================= FORMULÁRIO =================
 @app.route("/formulario")
 def formulario():
+
+    if "email" not in session:
+        return redirect("/")
+
+    if session.get("funcao") != "Formador Regional":
+        return "Acesso negado"
+
     is_gestor = session.get("email") in GESTORES
+
     return render_template("formulario.html", is_gestor=is_gestor)
 
 
@@ -70,6 +115,9 @@ def municipios(uf):
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
+    if "email" not in session:
+        return redirect("/")
+
     conn = conectar()
     cur = conn.cursor()
 
@@ -80,13 +128,25 @@ def salvar():
     for m in municipios:
         cur.execute("""
         INSERT INTO respostas (
-            usuario_id, municipio_nome, estado,
+            usuario_id, municipio_id, municipio_nome, estado,
+            formador_local,
+            pba, pba_qtd,
+            eja_alfabetizacao, eja_alfabetizacao_qtd,
+            eja_anos_iniciais, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             usuario,
-            request.form.get(f"nome_{m}"),
+            m,
+            request.form.get(f"nome_{m}") or "",
             estado,
+            request.form.get(f"formador_local_{m}") or "",
+            request.form.get(f"pba_{m}") or "",
+            int(request.form.get(f"pba_qtd_{m}") or 0),
+            request.form.get(f"eja_alf_{m}") or "",
+            int(request.form.get(f"eja_alf_qtd_{m}") or 0),
+            request.form.get(f"eja_ai_{m}") or "",
+            int(request.form.get(f"eja_ai_qtd_{m}") or 0),
             int(request.form.get(f"jan_{m}") or 0),
             int(request.form.get(f"fev_{m}") or 0),
             int(request.form.get(f"mar_{m}") or 0),
@@ -101,10 +161,10 @@ def salvar():
     conn.commit()
     conn.close()
 
-    return "Salvo com sucesso"
+    return "<h3>Dados enviados com sucesso!</h3><a href='/formulario'>Voltar</a>"
 
 
-# ================= EXPORTAR EXCEL =================
+# ================= EXPORTAR =================
 @app.route("/exportar")
 def exportar():
 
@@ -114,7 +174,6 @@ def exportar():
 
     output = io.BytesIO()
     df.to_excel(output, index=False)
-
     output.seek(0)
 
     return send_file(output,
@@ -123,7 +182,7 @@ def exportar():
     )
 
 
-# ================= IMPORTAR EXCEL =================
+# ================= IMPORTAR =================
 @app.route("/importar", methods=["POST"])
 def importar():
 
@@ -147,19 +206,28 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
+    # ESTADOS
     cur.execute("""
-    SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
-    FROM respostas GROUP BY estado
-    """)
-    dados_estado = cur.fetchall()
-
-    cur.execute("""
-    SELECT municipio_nome, estado, usuario_id,
-           SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
+    SELECT estado, COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
     FROM respostas
-    GROUP BY municipio_nome, estado, usuario_id
+    GROUP BY estado
     """)
-    dados_municipio = cur.fetchall()
+    dados_estado = cur.fetchall() or []
+
+    # MUNICÍPIOS
+    cur.execute("""
+    SELECT municipio_nome, estado,
+           COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
+    FROM respostas
+    GROUP BY municipio_nome, estado
+    ORDER BY 3 DESC
+    """)
+    dados_municipio_raw = cur.fetchall() or []
+
+    # adiciona nome do formador
+    dados_municipio = []
+    for m in dados_municipio_raw:
+        dados_municipio.append((m[0], m[1], "Formador", m[2]))
 
     conn.close()
 
@@ -169,6 +237,7 @@ def dashboard():
     )
 
 
+# ================= PERMITIR MOODLE =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
