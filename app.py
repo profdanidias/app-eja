@@ -8,11 +8,12 @@ app.secret_key = "segredo_super_seguro"
 GESTORES = ["professoradanidias@gmail.com"]
 
 
+# ================= CONEXÃO =================
 def conectar():
     return sqlite3.connect("database.db")
 
 
-# ================= LOGIN =================
+# ================= LOGIN AUTOMÁTICO =================
 @app.route("/")
 def auto_login():
     nome = request.args.get("nome")
@@ -47,7 +48,13 @@ def funcao():
 # ================= FORMULÁRIO =================
 @app.route("/formulario")
 def formulario():
-    return render_template("formulario.html")
+
+    if session.get("funcao") != "Formador Regional":
+        return "Acesso negado"
+
+    is_gestor = session.get("email") in GESTORES
+
+    return render_template("formulario.html", is_gestor=is_gestor)
 
 
 # ================= IBGE =================
@@ -125,15 +132,41 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM respostas")
-    dados = cur.fetchall()
+    cur.execute("""
+    SELECT 
+        usuario_id,
+        municipio_nome,
+        estado,
+        formador_local,
+        pba_qtd,
+        eja_alfabetizacao_qtd,
+        eja_anos_iniciais_qtd,
+        COALESCE(jan,0)+COALESCE(fev,0)+COALESCE(mar,0)+COALESCE(abr,0)+
+        COALESCE(mai,0)+COALESCE(jun,0)+COALESCE(jul,0)+COALESCE(ago,0)+COALESCE(setm,0)
+        as total
+    FROM respostas
+    """)
 
+    rows = cur.fetchall()
     conn.close()
+
+    dados = []
+    for r in rows:
+        dados.append({
+            "formador": r[0],
+            "municipio": r[1],
+            "estado": r[2],
+            "formador_local": r[3],
+            "pba": r[4] or 0,
+            "eja_alf": r[5] or 0,
+            "eja_ai": r[6] or 0,
+            "total": r[7] or 0
+        })
 
     return render_template("dashboard.html", dados=dados)
 
 
-# ================= PERMITIR MOODLE =================
+# ================= PERMITIR EMBED =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
