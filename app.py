@@ -8,12 +8,11 @@ app.secret_key = "segredo_super_seguro"
 # ================= CONFIG =================
 GESTORES = ["professoradanidias@gmail.com"]
 
-
 def conectar():
     return sqlite3.connect("database.db")
 
 
-# ================= LOGIN (MOODLE) =================
+# ================= LOGIN VIA MOODLE =================
 @app.route("/", methods=["GET"])
 def auto_login():
     nome = request.args.get("nome")
@@ -22,23 +21,17 @@ def auto_login():
     if nome and email:
         session["nome"] = nome.strip()
         session["email"] = email.strip().lower()
-
-        # define tipo corretamente
-        if session["email"] in GESTORES:
-            session["tipo"] = "gestor"
-        else:
-            session["tipo"] = "formador"
-
+        session["tipo"] = "gestor" if session["email"] in GESTORES else "formador"
         return redirect("/funcao")
 
+    # NÃO usa login.html (evita erro 500)
     return "Acesso inválido. Utilize o acesso via Moodle."
 
 
-# ================= FUNÇÃO =================
+# ================= ESCOLHA DE FUNÇÃO =================
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
 
-    # PROTEÇÃO: evita erro de sessão vazia
     if "email" not in session:
         return redirect("/")
 
@@ -60,8 +53,10 @@ def funcao():
 
         user_id = cur.lastrowid
 
-        cur.execute("INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
-                    (user_id, "login"))
+        cur.execute(
+            "INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
+            (user_id, "login")
+        )
 
         conn.commit()
         conn.close()
@@ -174,7 +169,6 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
-    # total por estado
     cur.execute("""
     SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
     FROM respostas
@@ -182,7 +176,6 @@ def dashboard():
     """)
     dados_estado = cur.fetchall()
 
-    # funções acessadas
     cur.execute("""
     SELECT funcao, COUNT(*)
     FROM usuarios
@@ -190,7 +183,6 @@ def dashboard():
     """)
     funcoes = cur.fetchall()
 
-    # total por mês
     cur.execute("""
     SELECT 
         SUM(jan), SUM(fev), SUM(mar), SUM(abr),
@@ -209,10 +201,10 @@ def dashboard():
     )
 
 
-# ================= EMBED (MOODLE) =================
+# ================= PERMITIR EMBED NO MOODLE =================
 @app.after_request
 def after_request(response):
-    response.headers["X-Frame-Options"] = "ALLOWALL"
+    response.headers['X-Frame-Options'] = 'ALLOWALL'
     return response
 
 
