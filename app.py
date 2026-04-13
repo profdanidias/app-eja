@@ -12,7 +12,61 @@ def conectar():
     return sqlite3.connect("database.db")
 
 
-# ================= LOGIN VIA MOODLE =================
+# ================= CRIAR BANCO AUTOMATICAMENTE =================
+def inicializar_banco():
+    conn = conectar()
+    cur = conn.cursor()
+
+    # tabela usuarios
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        email TEXT,
+        tipo TEXT,
+        funcao TEXT
+    )
+    """)
+
+    # tabela logs
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS logs_acesso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER,
+        acao TEXT,
+        data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # tabela respostas
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS respostas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER,
+        municipio_id TEXT,
+        municipio_nome TEXT,
+        estado TEXT,
+        formador_local TEXT,
+        pba TEXT,
+        pba_qtd INTEGER,
+        eja_alfabetizacao TEXT,
+        eja_alfabetizacao_qtd INTEGER,
+        eja_anos_iniciais TEXT,
+        eja_anos_iniciais_qtd INTEGER,
+        jan INTEGER, fev INTEGER, mar INTEGER, abr INTEGER,
+        mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# executa ao iniciar
+inicializar_banco()
+
+
+# ================= LOGIN =================
 @app.route("/", methods=["GET"])
 def auto_login():
     nome = request.args.get("nome")
@@ -24,11 +78,10 @@ def auto_login():
         session["tipo"] = "gestor" if session["email"] in GESTORES else "formador"
         return redirect("/funcao")
 
-    # NÃO usa login.html (evita erro 500)
     return "Acesso inválido. Utilize o acesso via Moodle."
 
 
-# ================= ESCOLHA DE FUNÇÃO =================
+# ================= FUNÇÃO =================
 @app.route("/funcao", methods=["GET", "POST"])
 def funcao():
 
@@ -41,22 +94,31 @@ def funcao():
         conn = conectar()
         cur = conn.cursor()
 
-        cur.execute("""
-        INSERT INTO usuarios (nome, email, tipo, funcao)
-        VALUES (?, ?, ?, ?)
-        """, (
-            session.get("nome"),
-            session.get("email"),
-            session.get("tipo"),
-            funcao
-        ))
+        # INSERÇÃO SEGURA
+        try:
+            cur.execute("""
+            INSERT INTO usuarios (nome, email, tipo, funcao)
+            VALUES (?, ?, ?, ?)
+            """, (
+                session.get("nome"),
+                session.get("email"),
+                session.get("tipo"),
+                funcao
+            ))
+        except Exception as e:
+            conn.close()
+            return f"Erro ao salvar usuário: {str(e)}"
 
         user_id = cur.lastrowid
 
-        cur.execute(
-            "INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
-            (user_id, "login")
-        )
+        try:
+            cur.execute(
+                "INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
+                (user_id, "login")
+            )
+        except Exception as e:
+            conn.close()
+            return f"Erro ao registrar log: {str(e)}"
 
         conn.commit()
         conn.close()
@@ -201,13 +263,12 @@ def dashboard():
     )
 
 
-# ================= PERMITIR EMBED NO MOODLE =================
+# ================= EMBED =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
     return response
 
 
-# ================= RUN =================
 if __name__ == "__main__":
     app.run(debug=True)
