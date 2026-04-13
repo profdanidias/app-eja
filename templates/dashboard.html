@@ -1,235 +1,138 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Dashboard EJA</title>
+<title>Dashboard</title>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 
 <style>
-body {
-    font-family: Arial;
-    margin: 20px;
-    background: #f5f7fa;
-}
+body { font-family: Arial; background:#f5f7fa; padding:20px; }
+select, button { padding:10px; margin:10px 0; }
 
-h1 {
-    text-align: center;
-}
+#mapa { height:500px; }
 
-.filtro {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}
+table { width:100%; background:white; border-collapse: collapse; }
+th, td { padding:10px; border-bottom:1px solid #ddd; }
 
-.cards {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.card {
-    flex: 1;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-}
-
-#mapa {
-    width: 100%;
-    height: 500px;
-    margin-bottom: 20px;
-    background: white;
-    border-radius: 10px;
-}
-
-.graficos {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-
-.grafico {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-}
-
-/* MUNICÍPIOS */
-.tabela {
-    background: white;
-    padding: 20px;
-    margin-top: 20px;
-    border-radius: 10px;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th, td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-}
-
-th {
-    background: #2c3e50;
-    color: white;
-}
+.alerta { color:red; font-weight:bold; }
 </style>
 </head>
 
 <body>
 
-<h1>Dashboard - Pacto EJA</h1>
-
-{% if meses %}
+<h1>Dashboard EJA</h1>
 
 <!-- FILTRO -->
-<div class="filtro">
-    <label><b>Filtrar por Estado:</b></label>
-    <select id="filtroEstado" multiple style="width:100%; padding:10px;"></select>
-</div>
+<select id="estadoFiltro">
+<option value="">Selecione o Estado</option>
+</select>
 
-<!-- CARDS -->
-<div class="cards">
-    <div class="card">
-        <h2 id="totalEstados"></h2>
-        <p>Estados</p>
-    </div>
+<div id="alerta" class="alerta"></div>
 
-    <div class="card">
-        <h2 id="totalParticipantes"></h2>
-        <p>Participantes</p>
-    </div>
+<button onclick="exportar()">Exportar Excel</button>
 
-    <div class="card">
-        <h2>{{ funcoes|length }}</h2>
-        <p>Tipos de usuários</p>
-    </div>
-</div>
+<form action="/importar" method="post" enctype="multipart/form-data">
+<input type="file" name="file">
+<button type="submit">Importar Excel</button>
+</form>
 
-<!-- MAPA -->
 <div id="mapa"></div>
 
-<!-- GRÁFICOS -->
-<div class="graficos">
-    <div class="grafico">
-        <h3>Participantes por Estado</h3>
-        <canvas id="graficoEstado"></canvas>
-    </div>
-
-    <div class="grafico">
-        <h3>Participantes por Mês</h3>
-        <canvas id="graficoMes"></canvas>
-    </div>
-</div>
-
-<!-- MUNICÍPIOS -->
-<div class="tabela">
-    <h3>Ranking de Municípios</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Município</th>
-                <th>Estado</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody id="tabelaMunicipios"></tbody>
-    </table>
-</div>
+<h3>Municípios</h3>
+<table>
+<thead>
+<tr>
+<th>Município</th>
+<th>Estado</th>
+<th>Formador</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="tabela"></tbody>
+</table>
 
 <script>
 
-const dadosEstadoOriginal = {{ dados_estado | tojson }};
-const dadosMunicipioOriginal = {{ dados_municipio | tojson }};
-const mesesOriginal = {{ meses | tojson }};
+const estados = {{ dados_estado | tojson }};
+const municipios = {{ dados_municipio | tojson }};
 
-const select = document.getElementById("filtroEstado");
+const select = document.getElementById("estadoFiltro");
 
-// preencher filtro
-dadosEstadoOriginal.forEach(e => {
+// preencher dropdown
+estados.forEach(e=>{
     let opt = document.createElement("option");
     opt.value = e[0];
     opt.text = e[0];
     select.appendChild(opt);
 });
 
-// MAPA
 google.charts.load('current', {'packages':['geochart']});
 
 function desenharMapa(dados){
     const data = new google.visualization.DataTable();
-    data.addColumn('string', 'Estado');
-    data.addColumn('number', 'Participantes');
+    data.addColumn('string','Estado');
+    data.addColumn('number','Total');
 
-    dados.forEach(e => {
-        data.addRow(['BR-' + e[0], e[1]]);
+    dados.forEach(e=>{
+        data.addRow(['BR-'+e[0], e[1]]);
     });
-
-    const options = {
-        region: 'BR',
-        resolution: 'provinces',
-        colorAxis: {colors: ['#d4e6f1', '#1f618d']}
-    };
 
     const chart = new google.visualization.GeoChart(document.getElementById('mapa'));
-    chart.draw(data, options);
-}
 
-// ATUALIZAR
-function atualizarDashboard(){
-
-    const selecionados = Array.from(select.selectedOptions).map(o => o.value);
-
-    let estados = dadosEstadoOriginal;
-    let municipios = dadosMunicipioOriginal;
-
-    if (selecionados.length > 0){
-        estados = estados.filter(e => selecionados.includes(e[0]));
-        municipios = municipios.filter(m => selecionados.includes(m[1]));
-    }
-
-    // cards
-    document.getElementById("totalEstados").innerText = estados.length;
-
-    const total = estados.reduce((acc,e)=>acc+e[1],0);
-    document.getElementById("totalParticipantes").innerText = total;
-
-    // mapa
-    desenharMapa(estados);
-
-    // tabela municípios
-    const tbody = document.getElementById("tabelaMunicipios");
-    tbody.innerHTML = "";
-
-    municipios.forEach(m => {
-        let tr = `<tr>
-            <td>${m[0]}</td>
-            <td>${m[1]}</td>
-            <td>${m[2]}</td>
-        </tr>`;
-        tbody.innerHTML += tr;
+    google.visualization.events.addListener(chart, 'select', function(){
+        let sel = chart.getSelection();
+        if(sel.length){
+            let estado = data.getValue(sel[0].row,0).replace('BR-','');
+            select.value = estado;
+            atualizar();
+        }
     });
 
+    chart.draw(data, {region:'BR', resolution:'provinces'});
 }
 
-// evento
-select.addEventListener("change", atualizarDashboard);
+function atualizar(){
 
-google.charts.setOnLoadCallback(atualizarDashboard);
+    let estado = select.value;
+
+    let filtrado = municipios;
+
+    if(estado){
+        filtrado = municipios.filter(m=>m[1]===estado);
+    }
+
+    if(filtrado.length===0){
+        document.getElementById("alerta").innerText = "Dados não enviados";
+    } else {
+        document.getElementById("alerta").innerText = "";
+    }
+
+    let tabela = document.getElementById("tabela");
+    tabela.innerHTML="";
+
+    filtrado.forEach(m=>{
+        tabela.innerHTML += `
+        <tr>
+        <td>${m[0]}</td>
+        <td>${m[1]}</td>
+        <td>${m[2]}</td>
+        <td>${m[3]}</td>
+        </tr>`;
+    });
+
+    desenharMapa(estados);
+}
+
+function exportar(){
+    window.location.href="/exportar";
+}
+
+select.addEventListener("change", atualizar);
+
+google.charts.setOnLoadCallback(atualizar);
 
 </script>
-
-{% else %}
-<h2 style="text-align:center;">Sem dados</h2>
-{% endif %}
 
 </body>
 </html>
