@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Dashboard EJA</title>
+<title>Dashboard EJA - Completo</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo"></script>
@@ -10,73 +10,263 @@
 
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:20px; }
-.card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
+
+.card {
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    margin-bottom:20px;
+}
+
+.grid {
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:10px;
+}
+
+select, input {
+    padding:6px;
+    width:100%;
+}
+
+button {
+    padding:8px 12px;
+    margin-top:10px;
+    cursor:pointer;
+}
 </style>
 </head>
 
 <body>
 
-<h2>Painel Nacional EJA</h2>
+<h2>📊 Dashboard Nacional EJA</h2>
 
-<button onclick="exportarExcel()">Exportar Excel</button>
-<button onclick="exportarPDF()">Exportar PDF</button>
-
+<!-- ================= FILTROS ================= -->
 <div class="card">
-<canvas id="mapa"></canvas>
+
+<h3>Filtros avançados</h3>
+
+<div class="grid">
+
+<select id="estado">
+<option value="">Estado</option>
+</select>
+
+<select id="municipio">
+<option value="">Município</option>
+</select>
+
+<select id="formador">
+<option value="">Formador</option>
+</select>
+
+<select id="formadorLocal">
+<option value="">Formador Local</option>
+<option value="sim">Sim</option>
+<option value="não">Não</option>
+<option value="não identificado">Não identificado</option>
+</select>
+
+<input id="pba" type="number" min="0" placeholder="PBA ≥">
+<input id="ejaalf" type="number" min="0" placeholder="EJA Alf ≥">
+<input id="ejaai" type="number" min="0" placeholder="EJA AI ≥">
+<input id="total" type="number" min="0" placeholder="Participantes ≥">
+
 </div>
 
+<button onclick="filtrar()">Aplicar filtros</button>
+<button onclick="limpar()">Limpar</button>
+
+<a href="/exportar_excel"><button>Exportar Excel</button></a>
+<a href="/exportar_pdf"><button>Exportar PDF</button></a>
+
+</div>
+
+
+<!-- ================= MAPA ================= -->
 <div class="card">
+<h3>🗺️ Mapa do Brasil</h3>
+<canvas id="mapa"></canvas>
+<p id="estadoSelecionado"></p>
+</div>
+
+
+<!-- ================= TABELA ================= -->
+<div class="card">
+<h3>📋 Municípios</h3>
 <table border="1" width="100%" id="tabela"></table>
 </div>
+
 
 <script>
 
 const dados = {{ dados | tojson }};
+let dadosBase = [...dados];
+let dadosFiltrados = [...dados];
 
-// tabela
+let geoGlobal;
+let chart;
+
+
+// ================= PREENCHER FILTROS =================
+function preencher(id, campo){
+    let set = new Set(dadosBase.map(d => d[campo]));
+    let el = document.getElementById(id);
+
+    set.forEach(v=>{
+        if(v) el.innerHTML += `<option value="${v}">${v}</option>`;
+    });
+}
+
+preencher("estado","estado");
+preencher("municipio","municipio");
+preencher("formador","formador");
+
+
+// ================= TABELA =================
 function render(lista){
+
     let t = document.getElementById("tabela");
-    t.innerHTML = "<tr><th>Município</th><th>Estado</th><th>Formador</th><th>Data</th><th>Total</th></tr>";
+
+    if(lista.length === 0){
+        t.innerHTML = "<tr><td>📌 Dados não enviados</td></tr>";
+        return;
+    }
+
+    t.innerHTML = `
+    <tr>
+        <th>Município</th>
+        <th>Estado</th>
+        <th>Formador</th>
+        <th>Data</th>
+        <th>PBA</th>
+        <th>EJA Alf</th>
+        <th>EJA AI</th>
+        <th>Total</th>
+    </tr>`;
 
     lista.forEach(d=>{
-        t.innerHTML += `<tr>
-        <td>${d.municipio}</td>
-        <td>${d.estado}</td>
-        <td>${d.formador}</td>
-        <td>${d.data}</td>
-        <td>${d.total}</td>
+        t.innerHTML += `
+        <tr>
+            <td>${d.municipio}</td>
+            <td>${d.estado}</td>
+            <td>${d.formador}</td>
+            <td>${d.data}</td>
+            <td>${d.pba}</td>
+            <td>${d.eja_alf}</td>
+            <td>${d.eja_ai}</td>
+            <td>${d.total}</td>
         </tr>`;
     });
 }
 
-render(dados);
+render(dadosBase);
 
-// mapa real
-(async () => {
 
-const res = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json");
-const world = await res.json();
+// ================= FILTROS =================
+function filtrar(){
 
-new Chart(document.getElementById("mapa"), {
-    type: "choropleth",
-    data: {
-        labels: ["Brasil"],
-        datasets: [{
-            label: "Mapa",
-            data: [{feature: topojson.feature(world, world.objects.countries).features.find(f=>f.properties.name==="Brazil"), value: 1}]
-        }]
-    }
-});
+    dadosFiltrados = dadosBase.filter(d => {
 
-})();
+        return (!estado.value || d.estado === estado.value)
+        && (!municipio.value || d.municipio === municipio.value)
+        && (!formador.value || d.formador === formador.value)
+        && (!formadorLocal.value || d.formador_local === formadorLocal.value)
+        && (d.pba >= (pba.value || 0))
+        && (d.eja_alf >= (ejaalf.value || 0))
+        && (d.eja_ai >= (ejaai.value || 0))
+        && (d.total >= (total.value || 0));
+    });
 
-function exportarExcel(){
-    window.location = "/exportar_excel";
+    render(dadosFiltrados);
+    atualizarMapa();
 }
 
-function exportarPDF(){
-    window.location = "/exportar_pdf";
+function limpar(){
+    location.reload();
 }
+
+
+// ================= MAPA =================
+async function carregarMapa(){
+
+    const res = await fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson");
+    geoGlobal = await res.json();
+
+    atualizarMapa();
+}
+
+function calcularTotais(){
+
+    let mapa = {};
+
+    dadosFiltrados.forEach(d=>{
+        mapa[d.estado] = (mapa[d.estado] || 0) + d.total;
+    });
+
+    return mapa;
+}
+
+
+function atualizarMapa(){
+
+    if(!geoGlobal) return;
+
+    let totais = calcularTotais();
+
+    const features = geoGlobal.features.map(f=>{
+        let nome = f.properties.name;
+
+        return {
+            feature: f,
+            value: totais[nome] || 0
+        };
+    });
+
+    if(chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("mapa"), {
+        type: "choropleth",
+        data: {
+            labels: geoGlobal.features.map(f=>f.properties.name),
+            datasets: [{
+                label: "Participantes",
+                data: features
+            }]
+        },
+        options: {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            let nome = ctx.raw.feature.properties.name;
+                            let valor = ctx.raw.value || 0;
+
+                            return `${nome} - ${valor || "Dados não enviados"}`;
+                        }
+                    }
+                }
+            },
+            onClick: (evt, elements, chart) => {
+
+                if(elements.length){
+
+                    let estado = chart.data.labels[elements[0].index];
+
+                    document.getElementById("estadoSelecionado").innerText =
+                        "Estado selecionado: " + estado;
+
+                    // mantém outros filtros + aplica estado
+                    estado.value = estado;
+
+                    filtrar();
+                }
+            }
+        }
+    });
+}
+
+carregarMapa();
 
 </script>
 
