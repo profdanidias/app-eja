@@ -9,97 +9,85 @@
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:20px; }
 .card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
+.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+select,input { padding:6px; }
 </style>
-</head>
 
+</head>
 <body>
 
-<h2>Painel de Monitoramento EJA</h2>
+<h2>Painel Nacional EJA</h2>
 
-<!-- FILTRO -->
-<select id="filtroEstado">
-<option value="">Selecione um Estado</option>
-</select>
-
-<button onclick="exportar()">Exportar Excel</button>
-
-<div id="aviso"></div>
-
-<!-- MAPA -->
 <div class="card">
-<h3>Mapa do Brasil (clique no estado)</h3>
-<img src="https://upload.wikimedia.org/wikipedia/commons/0/05/Brazil_states_blank_map.svg"
-width="500"
-onclick="alert('Mapa clicável pode ser refinado depois')">
+<h3>Filtros Inteligentes</h3>
+
+<div class="grid">
+<select id="estado"></select>
+<select id="municipio"></select>
+<select id="formador"></select>
+<select id="formadorLocal"></select>
+
+<input id="pba" type="number" placeholder="PBA ≥">
+<input id="ejaalf" type="number" placeholder="EJA Alf ≥">
+<input id="ejaai" type="number" placeholder="EJA AI ≥">
+<input id="participantes" type="number" placeholder="Participantes ≥">
+</div>
+
+<button onclick="filtrar()">Aplicar</button>
 </div>
 
 <div class="card">
-<canvas id="graficoEstado"></canvas>
+<h3>Mapa Interativo</h3>
+<canvas id="grafico"></canvas>
 </div>
 
 <div class="card">
-<table border="1" width="100%" id="tabela">
-<tr>
-<th>Município</th>
-<th>Estado</th>
-<th>Formador</th>
-<th>Total</th>
-</tr>
-</table>
+<h3>Resultados</h3>
+<table border="1" width="100%" id="tabela"></table>
 </div>
 
 <script>
 
-const estados = {{ dados_estado | tojson }};
-const municipios = {{ dados_municipio | tojson }};
+const dados = {{ dados | tojson }};
 
-// POPULAR SELECT
-const select = document.getElementById("filtroEstado");
-estados.forEach(e=>{
-    select.innerHTML += `<option value="${e[0]}">${e[0]}</option>`;
-});
+// transformação dos dados
+function total(d){
+    return d.slice(11,20).reduce((a,b)=>a+(b||0),0);
+}
 
-// FILTRO
-select.onchange = () => carregar(select.value);
+function render(lista){
 
-function carregar(estado){
+    let t = document.getElementById("tabela");
+    t.innerHTML = "<tr><th>Município</th><th>Estado</th><th>Formador</th><th>Total</th></tr>";
 
-    let tabela = document.getElementById("tabela");
-    tabela.innerHTML = `<tr><th>Município</th><th>Estado</th><th>Formador</th><th>Total</th></tr>`;
-
-    let filtrados = municipios.filter(m => !estado || m[1] === estado);
-
-    if(filtrados.length === 0){
-        document.getElementById("aviso").innerHTML = "<b>Dados não enviados</b>";
-    } else {
-        document.getElementById("aviso").innerHTML = "";
-    }
-
-    filtrados.forEach(m=>{
-        tabela.innerHTML += `<tr>
-        <td>${m[0]}</td>
-        <td>${m[1]}</td>
-        <td>${m[2]}</td>
-        <td>${m[3]}</td>
+    lista.forEach(d=>{
+        t.innerHTML += `<tr>
+        <td>${d[3]}</td>
+        <td>${d[4]}</td>
+        <td>${d[1]}</td>
+        <td>${total(d)}</td>
         </tr>`;
     });
 }
 
-// GRÁFICO
-new Chart(document.getElementById("graficoEstado"), {
-    type: "bar",
-    data: {
-        labels: estados.map(e=>e[0]),
-        datasets:[{data: estados.map(e=>e[1])}]
-    }
-});
+render(dados);
 
-// EXPORTAR
-function exportar(){
-    window.location.href = "/exportar";
+function filtrar(){
+
+    let lista = dados.filter(d=>{
+        return total(d) >= (participantes.value || 0);
+    });
+
+    render(lista);
 }
 
-carregar("");
+new Chart(document.getElementById("grafico"), {
+    type: "bar",
+    data: {
+        labels: dados.map(d=>d[4]),
+        datasets:[{data: dados.map(d=>total(d))}]
+    }
+});
 
 </script>
 

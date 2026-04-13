@@ -1,52 +1,16 @@
-from flask import Flask, render_template, request, redirect, session, jsonify, send_file
+from flask import Flask, render_template, request, redirect, session, jsonify
 import sqlite3
 import requests
-import pandas as pd
-import io
 
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
 
 GESTORES = ["professoradanidias@gmail.com"]
 
-
-# ================= CONEXÃO =================
 def conectar():
     return sqlite3.connect("database.db")
 
 
-# ================= CRIAR BANCO =================
-def inicializar_banco():
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS respostas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario_id TEXT,
-        municipio_id TEXT,
-        municipio_nome TEXT,
-        estado TEXT,
-        formador_local TEXT,
-        pba TEXT,
-        pba_qtd INTEGER,
-        eja_alfabetizacao TEXT,
-        eja_alfabetizacao_qtd INTEGER,
-        eja_anos_iniciais TEXT,
-        eja_anos_iniciais_qtd INTEGER,
-        jan INTEGER, fev INTEGER, mar INTEGER, abr INTEGER,
-        mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-
-inicializar_banco()
-
-
-# ================= LOGIN =================
 @app.route("/")
 def auto_login():
     nome = request.args.get("nome")
@@ -55,24 +19,17 @@ def auto_login():
     if nome and email:
         session["nome"] = nome
         session["email"] = email.lower()
-        session["tipo"] = "gestor" if email.lower() in GESTORES else "formador"
         return redirect("/funcao")
 
     return "Acesso inválido"
 
 
-# ================= FUNÇÃO =================
-@app.route("/funcao", methods=["GET", "POST"])
+@app.route("/funcao", methods=["GET","POST"])
 def funcao():
-
-    if "email" not in session:
-        return redirect("/")
-
     if request.method == "POST":
-        funcao = request.form.get("funcao")
-        session["funcao"] = funcao
+        session["funcao"] = request.form.get("funcao")
 
-        if funcao != "Formador Regional":
+        if session["funcao"] != "Formador Regional":
             return render_template("bloqueado.html")
 
         return redirect("/formulario")
@@ -80,42 +37,23 @@ def funcao():
     return render_template("funcao.html")
 
 
-# ================= FORMULÁRIO =================
 @app.route("/formulario")
 def formulario():
-
-    if "email" not in session:
-        return redirect("/")
-
-    if session.get("funcao") != "Formador Regional":
-        return "Acesso negado"
-
-    is_gestor = session.get("email") in GESTORES
-
-    return render_template("formulario.html", is_gestor=is_gestor)
+    return render_template("formulario.html")
 
 
-# ================= IBGE =================
 @app.route("/estados")
 def estados():
-    return jsonify(requests.get(
-        "https://servicodados.ibge.gov.br/api/v1/localidades/estados"
-    ).json())
+    return jsonify(requests.get("https://servicodados.ibge.gov.br/api/v1/localidades/estados").json())
 
 
 @app.route("/municipios/<uf>")
 def municipios(uf):
-    return jsonify(requests.get(
-        f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
-    ).json())
+    return jsonify(requests.get(f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios").json())
 
 
-# ================= SALVAR =================
 @app.route("/salvar", methods=["POST"])
 def salvar():
-
-    if "email" not in session:
-        return redirect("/")
 
     conn = conectar()
     cur = conn.cursor()
@@ -126,25 +64,18 @@ def salvar():
 
     for m in municipios:
         cur.execute("""
-        INSERT INTO respostas (
-            usuario_id, municipio_id, municipio_nome, estado,
-            formador_local,
-            pba, pba_qtd,
-            eja_alfabetizacao, eja_alfabetizacao_qtd,
-            eja_anos_iniciais, eja_anos_iniciais_qtd,
-            jan, fev, mar, abr, mai, jun, jul, ago, setm
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO respostas VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             usuario,
             m,
-            request.form.get(f"nome_{m}") or "",
+            request.form.get(f"nome_{m}"),
             estado,
-            request.form.get(f"formador_local_{m}") or "",
-            request.form.get(f"pba_{m}") or "",
+            request.form.get(f"formador_local_{m}"),
+            request.form.get(f"pba_{m}"),
             int(request.form.get(f"pba_qtd_{m}") or 0),
-            request.form.get(f"eja_alf_{m}") or "",
+            request.form.get(f"eja_alf_{m}"),
             int(request.form.get(f"eja_alf_qtd_{m}") or 0),
-            request.form.get(f"eja_ai_{m}") or "",
+            request.form.get(f"eja_ai_{m}"),
             int(request.form.get(f"eja_ai_qtd_{m}") or 0),
             int(request.form.get(f"jan_{m}") or 0),
             int(request.form.get(f"fev_{m}") or 0),
@@ -160,10 +91,9 @@ def salvar():
     conn.commit()
     conn.close()
 
-    return "<h3>Dados enviados com sucesso!</h3><a href='/formulario'>Voltar</a>"
+    return "Dados enviados com sucesso"
 
 
-# ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
 
@@ -173,53 +103,14 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
-    # ESTADOS
-    cur.execute("""
-    SELECT estado, COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
-    FROM respostas
-    GROUP BY estado
-    """)
-    dados_estado = cur.fetchall() or []
-
-    # MUNICÍPIOS
-    cur.execute("""
-    SELECT municipio_nome, estado, usuario_id,
-           COALESCE(SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm),0)
-    FROM respostas
-    GROUP BY municipio_nome, estado
-    ORDER BY 4 DESC
-    """)
-    dados_municipio = cur.fetchall() or []
+    cur.execute("SELECT * FROM respostas")
+    dados = cur.fetchall()
 
     conn.close()
 
-    # REGIÕES
-    regioes = {
-        "AC":"Norte","AP":"Norte","AM":"Norte","PA":"Norte","RO":"Norte","RR":"Norte","TO":"Norte",
-        "AL":"Nordeste","BA":"Nordeste","CE":"Nordeste","MA":"Nordeste","PB":"Nordeste",
-        "PE":"Nordeste","PI":"Nordeste","RN":"Nordeste","SE":"Nordeste",
-        "DF":"Centro-Oeste","GO":"Centro-Oeste","MT":"Centro-Oeste","MS":"Centro-Oeste",
-        "ES":"Sudeste","MG":"Sudeste","RJ":"Sudeste","SP":"Sudeste",
-        "PR":"Sul","RS":"Sul","SC":"Sul"
-    }
-
-    dados_regiao = {}
-
-    for estado, total in dados_estado:
-        regiao = regioes.get(estado, "Outros")
-        dados_regiao[regiao] = dados_regiao.get(regiao, 0) + total
-
-    top_municipios = sorted(dados_municipio, key=lambda x: x[3], reverse=True)[:5]
-
-    return render_template("dashboard.html",
-        dados_estado=dados_estado,
-        dados_municipio=dados_municipio,
-        dados_regiao=dados_regiao,
-        top_municipios=top_municipios
-    )
+    return render_template("dashboard.html", dados=dados)
 
 
-# ================= PERMITIR MOODLE =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
