@@ -33,7 +33,7 @@
 
 <br><br>
 
-<label><b>Municípios:</b></label><br>
+<label><b>Municípios (pode selecionar vários):</b></label><br>
 <select id="municipios" multiple size="8" name="municipios"></select>
 
 <br><br>
@@ -43,7 +43,7 @@
 <br>
 <button type="submit">Salvar Informações</button>
 
-{% if session.get("email") == "professoradanidias@gmail.com" %}
+{% if is_gestor %}
 <br><br>
 <a href="/dashboard">
 <button type="button" style="background:#28a745; color:white;">
@@ -125,7 +125,7 @@ function validarFormulario(){
 
     });
 
-    // validar meses visíveis
+    // valida meses visíveis
     let meses = document.querySelectorAll(".mes");
 
     meses.forEach(input => {
@@ -146,7 +146,7 @@ function validarFormulario(){
     return valido;
 }
 
-// remover erro ao digitar
+// remove erro ao digitar
 document.addEventListener("input", function(e){
     if (e.target.classList.contains("erro")){
         e.target.classList.remove("erro");
@@ -214,7 +214,7 @@ function gerarMeses(id){
     return html;
 }
 
-// ================= NÃO / NÃO SEI =================
+// ================= CONTROLE QUANTIDADE =================
 function controlarQuantidade(select,id){
 
     let campo = document.getElementById(id);
