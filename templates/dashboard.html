@@ -1,80 +1,151 @@
-<link rel="stylesheet" href="/static/style.css">
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard EJA</title>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<div class="container">
+<style>
+body {
+    font-family: Arial;
+    margin: 20px;
+    background: #f5f7fa;
+}
 
-<h2>📊 PAINEL DE MONITORAMENTO DE FORMAÇÕES DO PACTO EJA</h2>
+h1 {
+    text-align: center;
+    color: #2c3e50;
+}
 
-<!-- FILTRO DINÂMICO -->
-<form method="GET" class="filtro">
-    <label>Estados:</label>
-    <select name="estado" multiple>
-        {% for e in dados_estado %}
-        <option value="{{e[0]}}">{{e[0]}}</option>
-        {% endfor %}
-    </select>
-    <button>Filtrar</button>
-</form>
+/* CARDS */
+.cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.card {
+    flex: 1;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.card h2 {
+    margin: 0;
+    font-size: 28px;
+    color: #2980b9;
+}
+
+.card p {
+    margin: 5px 0 0;
+    color: #555;
+}
+
+/* GRÁFICOS */
+.graficos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.grafico {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+</style>
+</head>
+
+<body>
+
+<h1>Dashboard - Pacto EJA</h1>
 
 <!-- CARDS -->
 <div class="cards">
     <div class="card">
-        <h3>Total Participantes</h3>
-        <p id="total"></p>
+        <h2>{{ dados_estado|length }}</h2>
+        <p>Estados com dados</p>
     </div>
 
     <div class="card">
-        <h3>Estados Monitorados</h3>
-        <p>{{dados_estado|length}}</p>
+        <h2>
+            {{ meses[0] + meses[1] + meses[2] + meses[3] + meses[4] + meses[5] + meses[6] + meses[7] + meses[8] }}
+        </h2>
+        <p>Total de participantes</p>
     </div>
 
     <div class="card">
-        <h3>Usuários por Função</h3>
-        <p>{{funcoes|length}}</p>
+        <h2>{{ funcoes|length }}</h2>
+        <p>Tipos de usuários</p>
     </div>
 </div>
 
 <!-- GRÁFICOS -->
 <div class="graficos">
 
-<canvas id="estadoChart"></canvas>
-<canvas id="mesChart"></canvas>
+    <div class="grafico">
+        <h3>Participantes por Estado</h3>
+        <canvas id="graficoEstado"></canvas>
+    </div>
 
-</div>
+    <div class="grafico">
+        <h3>Participantes por Mês</h3>
+        <canvas id="graficoMes"></canvas>
+    </div>
+
+    <div class="grafico">
+        <h3>Usuários por Função</h3>
+        <canvas id="graficoFuncao"></canvas>
+    </div>
 
 </div>
 
 <script>
-let dados = {{dados_estado|safe}};
-let meses = {{meses|safe}};
-let funcoes = {{funcoes|safe}};
 
-// TOTAL
-let total = 0;
-meses.forEach(v => total += (v || 0));
-document.getElementById("total").innerText = total;
-
-// ESTADOS
-new Chart(document.getElementById("estadoChart"), {
+// ================= ESTADOS =================
+const estados = {{ dados_estado | tojson }};
+new Chart(document.getElementById("graficoEstado"), {
     type: "bar",
     data: {
-        labels: dados.map(x=>x[0]),
+        labels: estados.map(e => e[0]),
         datasets: [{
             label: "Participantes",
-            data: dados.map(x=>x[1])
+            data: estados.map(e => e[1]),
         }]
     }
 });
 
-// MESES
-new Chart(document.getElementById("mesChart"), {
+// ================= MESES =================
+const meses = {{ meses | tojson }};
+new Chart(document.getElementById("graficoMes"), {
     type: "line",
     data: {
         labels: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"],
         datasets: [{
-            label: "Participantes por mês",
-            data: meses
+            label: "Participantes",
+            data: meses,
         }]
     }
 });
+
+// ================= FUNÇÕES =================
+const funcoes = {{ funcoes | tojson }};
+new Chart(document.getElementById("graficoFuncao"), {
+    type: "pie",
+    data: {
+        labels: funcoes.map(f => f[0]),
+        datasets: [{
+            data: funcoes.map(f => f[1]),
+        }]
+    }
+});
+
 </script>
+
+</body>
+</html>
