@@ -15,7 +15,18 @@ body {
 
 h1 {
     text-align: center;
-    color: #2c3e50;
+}
+
+.filtro {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+select {
+    width: 100%;
+    padding: 10px;
 }
 
 .cards {
@@ -29,14 +40,7 @@ h1 {
     background: white;
     padding: 20px;
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     text-align: center;
-}
-
-.card h2 {
-    margin: 0;
-    font-size: 28px;
-    color: #2980b9;
 }
 
 .graficos {
@@ -59,16 +63,22 @@ h1 {
 
 {% if meses %}
 
+<!-- FILTRO -->
+<div class="filtro">
+    <label><b>Filtrar por Estado:</b></label>
+    <select id="filtroEstado" multiple></select>
+</div>
+
 <!-- CARDS -->
 <div class="cards">
     <div class="card">
-        <h2>{{ dados_estado|length }}</h2>
-        <p>Estados com dados</p>
+        <h2 id="totalEstados"></h2>
+        <p>Estados</p>
     </div>
 
     <div class="card">
-        <h2>{{ meses | sum }}</h2>
-        <p>Total de participantes</p>
+        <h2 id="totalParticipantes"></h2>
+        <p>Participantes</p>
     </div>
 
     <div class="card">
@@ -79,7 +89,6 @@ h1 {
 
 <!-- GRÁFICOS -->
 <div class="graficos">
-
     <div class="grafico">
         <h3>Participantes por Estado</h3>
         <canvas id="graficoEstado"></canvas>
@@ -94,54 +103,96 @@ h1 {
         <h3>Usuários por Função</h3>
         <canvas id="graficoFuncao"></canvas>
     </div>
-
 </div>
 
 <script>
 
-const estados = {{ dados_estado | tojson }};
-new Chart(document.getElementById("graficoEstado"), {
-    type: "bar",
-    data: {
-        labels: estados.map(e => e[0]),
-        datasets: [{
-            label: "Participantes",
-            data: estados.map(e => e[1]),
-        }]
-    }
-});
-
-const meses = {{ meses | tojson }};
-new Chart(document.getElementById("graficoMes"), {
-    type: "line",
-    data: {
-        labels: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"],
-        datasets: [{
-            label: "Participantes",
-            data: meses,
-        }]
-    }
-});
-
+const dadosEstadoOriginal = {{ dados_estado | tojson }};
+const mesesOriginal = {{ meses | tojson }};
 const funcoes = {{ funcoes | tojson }};
-new Chart(document.getElementById("graficoFuncao"), {
-    type: "pie",
-    data: {
-        labels: funcoes.map(f => f[0]),
-        datasets: [{
-            data: funcoes.map(f => f[1]),
-        }]
-    }
+
+// ================= POPULAR FILTRO =================
+const select = document.getElementById("filtroEstado");
+
+dadosEstadoOriginal.forEach(e => {
+    let option = document.createElement("option");
+    option.value = e[0];
+    option.text = e[0];
+    select.appendChild(option);
 });
+
+// ================= GRÁFICOS =================
+let graficoEstado, graficoMes, graficoFuncao;
+
+function atualizarDashboard() {
+
+    const selecionados = Array.from(select.selectedOptions).map(o => o.value);
+
+    let dadosFiltrados = dadosEstadoOriginal;
+
+    if (selecionados.length > 0) {
+        dadosFiltrados = dadosEstadoOriginal.filter(e => selecionados.includes(e[0]));
+    }
+
+    // CARD TOTAL
+    document.getElementById("totalEstados").innerText = dadosFiltrados.length;
+
+    const totalParticipantes = dadosFiltrados.reduce((acc, e) => acc + e[1], 0);
+    document.getElementById("totalParticipantes").innerText = totalParticipantes;
+
+    // ================= GRAFICO ESTADO =================
+    if (graficoEstado) graficoEstado.destroy();
+
+    graficoEstado = new Chart(document.getElementById("graficoEstado"), {
+        type: "bar",
+        data: {
+            labels: dadosFiltrados.map(e => e[0]),
+            datasets: [{
+                label: "Participantes",
+                data: dadosFiltrados.map(e => e[1]),
+            }]
+        }
+    });
+
+    // ================= GRAFICO MES =================
+    if (graficoMes) graficoMes.destroy();
+
+    graficoMes = new Chart(document.getElementById("graficoMes"), {
+        type: "line",
+        data: {
+            labels: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"],
+            datasets: [{
+                label: "Participantes",
+                data: mesesOriginal,
+            }]
+        }
+    });
+
+    // ================= GRAFICO FUNÇÃO =================
+    if (graficoFuncao) graficoFuncao.destroy();
+
+    graficoFuncao = new Chart(document.getElementById("graficoFuncao"), {
+        type: "pie",
+        data: {
+            labels: funcoes.map(f => f[0]),
+            datasets: [{
+                data: funcoes.map(f => f[1]),
+            }]
+        }
+    });
+
+}
+
+// evento filtro
+select.addEventListener("change", atualizarDashboard);
+
+// inicializa
+atualizarDashboard();
 
 </script>
 
 {% else %}
-
-<h2 style="text-align:center; color:#999;">
-Ainda não há dados cadastrados.
-</h2>
-
+<h2 style="text-align:center;">Sem dados</h2>
 {% endif %}
 
 </body>
