@@ -18,7 +18,6 @@ h1 {
     text-align: center;
 }
 
-/* FILTRO */
 .filtro {
     background: white;
     padding: 15px;
@@ -26,7 +25,6 @@ h1 {
     margin-bottom: 20px;
 }
 
-/* CARDS */
 .cards {
     display: flex;
     gap: 20px;
@@ -41,16 +39,14 @@ h1 {
     text-align: center;
 }
 
-/* MAPA */
 #mapa {
     width: 100%;
     height: 500px;
+    margin-bottom: 20px;
     background: white;
     border-radius: 10px;
-    margin-bottom: 20px;
 }
 
-/* GRÁFICOS */
 .graficos {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -61,6 +57,29 @@ h1 {
     background: white;
     padding: 20px;
     border-radius: 10px;
+}
+
+/* MUNICÍPIOS */
+.tabela {
+    background: white;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 10px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background: #2c3e50;
+    color: white;
 }
 </style>
 </head>
@@ -111,107 +130,99 @@ h1 {
     </div>
 </div>
 
+<!-- MUNICÍPIOS -->
+<div class="tabela">
+    <h3>Ranking de Municípios</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Município</th>
+                <th>Estado</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody id="tabelaMunicipios"></tbody>
+    </table>
+</div>
+
 <script>
 
-// ================= DADOS =================
 const dadosEstadoOriginal = {{ dados_estado | tojson }};
+const dadosMunicipioOriginal = {{ dados_municipio | tojson }};
 const mesesOriginal = {{ meses | tojson }};
-const funcoes = {{ funcoes | tojson }};
 
-// ================= FILTRO =================
 const select = document.getElementById("filtroEstado");
 
+// preencher filtro
 dadosEstadoOriginal.forEach(e => {
-    let option = document.createElement("option");
-    option.value = e[0];
-    option.text = e[0];
-    select.appendChild(option);
+    let opt = document.createElement("option");
+    opt.value = e[0];
+    opt.text = e[0];
+    select.appendChild(opt);
 });
 
-// ================= MAPA =================
-google.charts.load('current', {
-    'packages':['geochart'],
-});
+// MAPA
+google.charts.load('current', {'packages':['geochart']});
 
-let mapa;
-
-function desenharMapa(dadosFiltrados){
-
+function desenharMapa(dados){
     const data = new google.visualization.DataTable();
     data.addColumn('string', 'Estado');
     data.addColumn('number', 'Participantes');
 
-    dadosFiltrados.forEach(e => {
-        data.addRow([ 'BR-' + e[0], e[1] ]);
+    dados.forEach(e => {
+        data.addRow(['BR-' + e[0], e[1]]);
     });
 
     const options = {
         region: 'BR',
         resolution: 'provinces',
-        colorAxis: {colors: ['#d4e6f1', '#1f618d']},
-        backgroundColor: '#ffffff',
-        datalessRegionColor: '#eeeeee'
+        colorAxis: {colors: ['#d4e6f1', '#1f618d']}
     };
 
-    mapa = new google.visualization.GeoChart(document.getElementById('mapa'));
-    mapa.draw(data, options);
+    const chart = new google.visualization.GeoChart(document.getElementById('mapa'));
+    chart.draw(data, options);
 }
 
-// ================= GRÁFICOS =================
-let graficoEstado, graficoMes;
-
+// ATUALIZAR
 function atualizarDashboard(){
 
     const selecionados = Array.from(select.selectedOptions).map(o => o.value);
 
-    let dadosFiltrados = dadosEstadoOriginal;
+    let estados = dadosEstadoOriginal;
+    let municipios = dadosMunicipioOriginal;
 
     if (selecionados.length > 0){
-        dadosFiltrados = dadosEstadoOriginal.filter(e => selecionados.includes(e[0]));
+        estados = estados.filter(e => selecionados.includes(e[0]));
+        municipios = municipios.filter(m => selecionados.includes(m[1]));
     }
 
-    // CARDS
-    document.getElementById("totalEstados").innerText = dadosFiltrados.length;
+    // cards
+    document.getElementById("totalEstados").innerText = estados.length;
 
-    const total = dadosFiltrados.reduce((acc,e)=>acc+e[1],0);
+    const total = estados.reduce((acc,e)=>acc+e[1],0);
     document.getElementById("totalParticipantes").innerText = total;
 
-    // MAPA
-    desenharMapa(dadosFiltrados);
+    // mapa
+    desenharMapa(estados);
 
-    // GRAFICO ESTADO
-    if (graficoEstado) graficoEstado.destroy();
+    // tabela municípios
+    const tbody = document.getElementById("tabelaMunicipios");
+    tbody.innerHTML = "";
 
-    graficoEstado = new Chart(document.getElementById("graficoEstado"), {
-        type: "bar",
-        data: {
-            labels: dadosFiltrados.map(e => e[0]),
-            datasets: [{
-                label: "Participantes",
-                data: dadosFiltrados.map(e => e[1]),
-            }]
-        }
+    municipios.forEach(m => {
+        let tr = `<tr>
+            <td>${m[0]}</td>
+            <td>${m[1]}</td>
+            <td>${m[2]}</td>
+        </tr>`;
+        tbody.innerHTML += tr;
     });
 
-    // GRAFICO MES
-    if (graficoMes) graficoMes.destroy();
-
-    graficoMes = new Chart(document.getElementById("graficoMes"), {
-        type: "line",
-        data: {
-            labels: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"],
-            datasets: [{
-                label: "Participantes",
-                data: mesesOriginal,
-            }]
-        }
-    });
 }
 
 // evento
 select.addEventListener("change", atualizarDashboard);
 
-// inicializa
 google.charts.setOnLoadCallback(atualizarDashboard);
 
 </script>
