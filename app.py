@@ -1,97 +1,77 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import sqlite3
 import requests
-import os
 
 app = Flask(__name__)
 app.secret_key = "segredo_super_seguro"
 
+# ================= CONFIG =================
 GESTORES = ["professoradanidias@gmail.com"]
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "database.db")
-
 def conectar():
-    return sqlite3.connect(DB_PATH)
+    return sqlite3.connect("database.db")
 
-def criar_banco():
-    conn = conectar()
-    cur = conn.cursor()
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        email TEXT,
-        tipo TEXT,
-        funcao TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS respostas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario_id INTEGER,
-        municipio_id INTEGER,
-        municipio_nome TEXT,
-        estado TEXT,
-        formador_local TEXT,
-        pba TEXT,
-        pba_qtd INTEGER,
-        eja_alfabetizacao TEXT,
-        eja_alfabetizacao_qtd INTEGER,
-        eja_anos_iniciais TEXT,
-        eja_anos_iniciais_qtd INTEGER,
-        jan INTEGER, fev INTEGER, mar INTEGER, abr INTEGER,
-        mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-criar_banco()
-
-# LOGIN
-@app.route("/")
+# ================= LOGIN (MOODLE) =================
+@app.route("/", methods=["GET"])
 def auto_login():
     nome = request.args.get("nome")
     email = request.args.get("email")
 
     if nome and email:
-        session["nome"] = nome
-        session["email"] = email
-
-        if email.lower() in [g.lower() for g in GESTORES]:
-            session["tipo"] = "gestor"
-        else:
-            session["tipo"] = "formador"
-
+        session["nome"] = nome.strip()
+        session["email"] = email.strip().lower()
+        session["tipo"] = "gestor" if session["email"] in GESTORES else "formador"
         return redirect("/funcao")
 
-    return "Acesso via Moodle necessário. Acesse o Curso para Formadores Regionais no endereço https://pactoeja.sead.ufpb.br/"
+    return "Acesso inválido"
 
-# FUNÇÃO
-@app.route("/funcao", methods=["GET","POST"])
+
+# ================= FUNÇÃO =================
+@app.route("/funcao", methods=["GET", "POST"])
 def funcao():
     if request.method == "POST":
         funcao = request.form.get("funcao")
 
+        conn = conectar()
+        cur = conn.cursor()
+
+        cur.execute("""
+        INSERT INTO usuarios (nome, email, tipo, funcao)
+        VALUES (?, ?, ?, ?)
+        """, (
+            session.get("nome"),
+            session.get("email"),
+            session.get("tipo"),
+            funcao
+        ))
+
+        user_id = cur.lastrowid
+
+        cur.execute("INSERT INTO logs_acesso (usuario_id, acao) VALUES (?, ?)",
+                    (user_id, "login"))
+
+        conn.commit()
+        conn.close()
+
+        session["user_id"] = user_id
         session["funcao"] = funcao
 
         if funcao != "Formador Regional":
-            return "Obrigada por sua contribuição."
+            return render_template("bloqueado.html")
 
         return redirect("/formulario")
 
     return render_template("funcao.html")
 
-# IBGE
+
+# ================= IBGE =================
 @app.route("/estados")
 def estados():
     return jsonify(requests.get(
         "https://servicodados.ibge.gov.br/api/v1/localidades/estados"
     ).json())
+
 
 @app.route("/municipios/<uf>")
 def municipios(uf):
@@ -99,34 +79,42 @@ def municipios(uf):
         f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
     ).json())
 
-# FORMULÁRIO
+
+# ================= FORMULÁRIO =================
 @app.route("/formulario")
 def formulario():
     if session.get("funcao") != "Formador Regional":
         return "Acesso negado"
-    return render_template("formulario.html")
 
-# SALVAR
+    is_gestor = session.get("email") in GESTORES
+
+    return render_template("formulario.html", is_gestor=is_gestor)
+
+
+# ================= SALVAR =================
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
     conn = conectar()
     cur = conn.cursor()
 
-    estado = request.form.get("estado")
+    usuario = session["user_id"]
+    estado = request.form["estado"]
     municipios = request.form.getlist("municipios")
 
     for m in municipios:
+
         cur.execute("""
         INSERT INTO respostas (
-            municipio_id, municipio_nome, estado,
+            usuario_id, municipio_id, municipio_nome, estado,
             formador_local,
             pba, pba_qtd,
             eja_alfabetizacao, eja_alfabetizacao_qtd,
             eja_anos_iniciais, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
+            usuario,
             m,
             request.form.get(f"nome_{m}"),
             estado,
@@ -137,15 +125,15 @@ def salvar():
             request.form.get(f"eja_alf_qtd_{m}") or 0,
             request.form.get(f"eja_ai_{m}"),
             request.form.get(f"eja_ai_qtd_{m}") or 0,
-            max(0, int(request.form.get(f"jan_{m}") or 0)),
-            max(0, int(request.form.get(f"fev_{m}") or 0)),
-            max(0, int(request.form.get(f"mar_{m}") or 0)),
-            max(0, int(request.form.get(f"abr_{m}") or 0)),
-            max(0, int(request.form.get(f"mai_{m}") or 0)),
-            max(0, int(request.form.get(f"jun_{m}") or 0)),
-            max(0, int(request.form.get(f"jul_{m}") or 0)),
-            max(0, int(request.form.get(f"ago_{m}") or 0)),
-            max(0, int(request.form.get(f"setm_{m}") or 0))
+            request.form.get(f"jan_{m}") or 0,
+            request.form.get(f"fev_{m}") or 0,
+            request.form.get(f"mar_{m}") or 0,
+            request.form.get(f"abr_{m}") or 0,
+            request.form.get(f"mai_{m}") or 0,
+            request.form.get(f"jun_{m}") or 0,
+            request.form.get(f"jul_{m}") or 0,
+            request.form.get(f"ago_{m}") or 0,
+            request.form.get(f"setm_{m}") or 0
         ))
 
     conn.commit()
@@ -153,13 +141,11 @@ def salvar():
 
     return "Dados enviados com sucesso!"
 
-# DASHBOARD
+
+# ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
-
-    email = session.get("email")
-
-    if not email or email.lower() not in [g.lower() for g in GESTORES]:
+    if session.get("tipo") != "gestor":
         return "Acesso negado"
 
     conn = conectar()
@@ -167,31 +153,40 @@ def dashboard():
 
     cur.execute("""
     SELECT estado, SUM(jan+fev+mar+abr+mai+jun+jul+ago+setm)
-    FROM respostas GROUP BY estado
+    FROM respostas
+    GROUP BY estado
     """)
-
     dados_estado = cur.fetchall()
+
+    cur.execute("""
+    SELECT funcao, COUNT(*)
+    FROM usuarios
+    GROUP BY funcao
+    """)
+    funcoes = cur.fetchall()
 
     cur.execute("""
     SELECT SUM(jan),SUM(fev),SUM(mar),SUM(abr),
            SUM(mai),SUM(jun),SUM(jul),SUM(ago),SUM(setm)
     FROM respostas
     """)
-
     meses = cur.fetchone()
 
     conn.close()
 
     return render_template("dashboard.html",
         dados_estado=dados_estado,
+        funcoes=funcoes,
         meses=meses
     )
 
-# EMBED
+
+# ================= EMBED MOODLE =================
 @app.after_request
 def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
     return response
+
 
 if __name__ == "__main__":
     app.run()
