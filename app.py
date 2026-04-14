@@ -1,139 +1,79 @@
-import os
-from datetime import datetime
 import io
+from datetime import datetime
 
 from flask import (
     Flask, render_template, request, redirect,
     session, jsonify, send_file
 )
 import psycopg2
-import psycopg2.extras
-import requests
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import letter
 
-# ================= CONFIGURAÇÃO BÁSICA =================
-
 app = Flask(__name__)
-app.secret_key = "segredo_super_seguro"
+app.secret_key = "SUA_SECRET_KEY_AQUI"
 
-# E-mail(s) da gestora
-GESTORES = ["professoradanidias@gmail.com"]
+# ================= CONFIGURAÇÕES BÁSICAS =================
 
-# URL do banco (Render → Environment → DATABASE_URL)
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-
-# ================= CONEXÃO E TABELAS =================
-
+# Ajuste para o seu banco
 def conectar():
-    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
-    return conn
+    return psycopg2.connect(
+        host="SEU_HOST",
+        dbname="SEU_DB",
+        user="SEU_USER",
+        password="SUA_SENHA",
+        port=5432
+    )
 
+# E-mails de gestores
+GESTORES = {
+    "gestor1@exemplo.com",
+    "gestor2@exemplo.com",
+}
 
-def criar_tabelas():
+# ================= ESTADOS / MUNICÍPIOS (EXEMPLO) =================
+# Você provavelmente já tem essas tabelas no banco; aqui é só o esqueleto.
+
+def listar_estados():
     conn = conectar()
     cur = conn.cursor()
-
-    # Tabela de respostas
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS respostas (
-            id SERIAL PRIMARY KEY,
-            usuario_id TEXT,
-            municipio_id TEXT,
-            municipio_nome TEXT,
-            estado TEXT,
-            formador_local TEXT,
-            pba TEXT,
-            pba_qtd INTEGER,
-            eja_alfabetizacao TEXT,
-            eja_alfabetizacao_qtd INTEGER,
-            eja_anos_iniciais TEXT,
-            eja_anos_iniciais_qtd INTEGER,
-            jan INTEGER, fev INTEGER, mar INTEGER, abr INTEGER,
-            mai INTEGER, jun INTEGER, jul INTEGER, ago INTEGER, setm INTEGER,
-            data_envio TIMESTAMP
-        )
-    """)
-
-    # Tabela de estado fixo por usuário (apenas formadores)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS usuario_estado (
-            email TEXT PRIMARY KEY,
-            estado TEXT NOT NULL
-        )
-    """)
-
-    conn.commit()
+    cur.execute("SELECT sigla, nome FROM estados ORDER BY nome")
+    rows = cur.fetchall()
     conn.close()
+    return [{"sigla": r[0], "nome": r[1]} for r in rows]
 
-
-criar_tabelas()
-
-
-# ================= ESTADO FIXO (APENAS FORMADORES) =================
-
-def obter_estado_fixo(email):
-    if not email:
-        return None
-    # Gestora NÃO tem estado fixo
-    if email in GESTORES:
-        return None
-
+def listar_municipios_por_uf(uf):
     conn = conectar()
     cur = conn.cursor()
-    cur.execute("SELECT estado FROM usuario_estado WHERE email = %s", (email,))
-    row = cur.fetchone()
+    cur.execute(
+        "SELECT id, nome FROM municipios WHERE uf = %s ORDER BY nome",
+        (uf,)
+    )
+    rows = cur.fetchall()
     conn.close()
-    return row[0] if row else None
-
+    return [{"id": r[0], "nome": r[1]} for r in rows]
 
 def definir_estado_fixo(email, estado):
-    if not email or not estado:
-        return
-    # Não fixa estado para gestora
-    if email in GESTORES:
-        return
+    # Se você tiver lógica específica para formadores, coloque aqui.
+    # Neste esqueleto, não faz nada além de existir.
+    pass
 
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO usuario_estado (email, estado)
-        VALUES (%s, %s)
-        ON CONFLICT (email) DO UPDATE SET estado = EXCLUDED.estado
-    """, (email, estado))
-    conn.commit()
-    conn.close()
+# ================= LOGIN SIMPLES (EXEMPLO) =================
 
-
-# ================= LOGIN / FLUXO INICIAL =================
-
-@app.route("/")
-def auto_login():
-    nome = request.args.get("nome")
-    email = request.args.get("email")
-
-    if nome and email:
-        session["nome"] = nome
-        session["email"] = email.lower()
-        return redirect("/funcao")
-
-    return "Acesso inválido"
-
-
-@app.route("/funcao", methods=["GET", "POST"])
-def funcao():
+@app.route("/", methods=["GET", "POST"])
+def login():
     if request.method == "POST":
-        session["funcao"] = request.form.get("funcao")
+        nome = request.form.get("nome")
+        email = request.form.get("email")
 
-        if session["funcao"] != "Formador Regional":
-            return render_template("bloqueado.html")
+        session["nome"] = nome
+        session["email"] = email
 
         return redirect("/formulario")
 
-    return render_template("funcao.html")
+    return render_template("login.html")
 
+# ================= FORMULÁRIO =================
 
 @app.route("/formulario")
 def formulario():
@@ -142,69 +82,72 @@ def formulario():
         return redirect("/")
 
     is_gestor = email in GESTORES
-    estado_fixo = obter_estado_fixo(email)
 
-    # Para gestora, carregamos a lista de estados do IBGE
-    estados = []
-    if is_gestor:
-        try:
-            r = requests.get("https://servicodados.ibge.gov.br/api/v1/localidades/estados")
-            if r.status_code == 200:
-                estados = sorted(r.json(), key=lambda x: x["sigla"])
-        except Exception:
-            estados = []
+    estados = listar_estados()
+    estado_fixo = None
+
+    if not is_gestor:
+        # Se quiser amarrar o estado do formador, faça aqui
+        # Exemplo simples: pega o primeiro estado
+        if estados:
+            estado_fixo = estados[0]["sigla"]
 
     return render_template(
         "formulario.html",
         is_gestor=is_gestor,
-        estado_fixo=estado_fixo,
-        estados=estados
+        estados=estados,
+        estado_fixo=estado_fixo
     )
 
-
-# ================= IBGE =================
-
-@app.route("/estados")
-def estados():
-    r = requests.get("https://servicodados.ibge.gov.br/api/v1/localidades/estados")
-    return jsonify(r.json())
-
+# ================= MUNICÍPIOS POR ESTADO =================
 
 @app.route("/municipios/<uf>")
 def municipios(uf):
-    r = requests.get(f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios")
-    return jsonify(r.json())
+    lista = listar_municipios_por_uf(uf)
+    return jsonify(lista)
 
-
-# ================= API DADOS ANTERIORES MUNICÍPIO =================
+# ================= API DADOS ANTERIORES POR MUNICÍPIO =================
 
 @app.route("/api/dados_municipio/<municipio_id>")
 def api_dados_municipio(municipio_id):
-    usuario = session.get("nome")
-    if not usuario:
+    email = session.get("email")
+    if not email:
         return jsonify({"existe": False})
 
     conn = conectar()
     cur = conn.cursor()
     cur.execute("""
-        SELECT 
+        SELECT
             formador_local,
             pba, pba_qtd,
             eja_alfabetizacao, eja_alfabetizacao_qtd,
             eja_anos_iniciais, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm
         FROM respostas
-        WHERE usuario_id = %s AND municipio_id = %s
+        WHERE usuario_id = %s
+          AND municipio_id = %s
         ORDER BY data_envio DESC
         LIMIT 1
-    """, (usuario, municipio_id))
+    """, (email, municipio_id))
     row = cur.fetchone()
     conn.close()
 
     if not row:
         return jsonify({"existe": False})
 
-    dados = {
+    meses_dict = {
+        "jan": row[7] or 0,
+        "fev": row[8] or 0,
+        "mar": row[9] or 0,
+        "abr": row[10] or 0,
+        "mai": row[11] or 0,
+        "jun": row[12] or 0,
+        "jul": row[13] or 0,
+        "ago": row[14] or 0,
+        "setm": row[15] or 0,
+    }
+
+    return jsonify({
         "existe": True,
         "formador_local": row[0] or "",
         "pba": row[1] or "",
@@ -213,20 +156,9 @@ def api_dados_municipio(municipio_id):
         "eja_alf_qtd": row[4] or 0,
         "eja_ai": row[5] or "",
         "eja_ai_qtd": row[6] or 0,
-        "meses": {
-            "jan": row[7] or 0,
-            "fev": row[8] or 0,
-            "mar": row[9] or 0,
-            "abr": row[10] or 0,
-            "mai": row[11] or 0,
-            "jun": row[12] or 0,
-            "jul": row[13] or 0,
-            "ago": row[14] or 0,
-            "setm": row[15] or 0
-        }
-    }
-    return jsonify(dados)
-
+        "meses": meses_dict,
+        "mes_atual": datetime.now().month
+    })
 
 # ================= SALVAR RESPOSTAS =================
 
@@ -239,16 +171,30 @@ def salvar():
     email = session.get("email")
     estado = request.form.get("estado")
 
-    # Fixa estado apenas para formadores
     definir_estado_fixo(email, estado)
 
-    # Municípios selecionados (no novo formulário é um único name="municipios")
     municipios = request.form.getlist("municipios")
     data_envio = datetime.now()
 
     ids_inseridos = []
 
     for m in municipios:
+        # Normalizar respostas condicionais
+        pba = request.form.get(f"pba_{m}") or ""
+        pba_qtd = int(request.form.get(f"pba_qtd_{m}") or 0)
+        if pba != "Sim":
+            pba_qtd = 0
+
+        eja_alf = request.form.get(f"eja_alf_{m}") or ""
+        eja_alf_qtd = int(request.form.get(f"eja_alf_qtd_{m}") or 0)
+        if eja_alf != "Sim":
+            eja_alf_qtd = 0
+
+        eja_ai = request.form.get(f"eja_ai_{m}") or ""
+        eja_ai_qtd = int(request.form.get(f"eja_ai_qtd_{m}") or 0)
+        if eja_ai != "Sim":
+            eja_ai_qtd = 0
+
         cur.execute("""
             INSERT INTO respostas (
                 usuario_id, municipio_id, municipio_nome, estado,
@@ -273,12 +219,11 @@ def salvar():
             request.form.get(f"nome_{m}") or "",
             estado,
             request.form.get(f"formador_local_{m}") or "",
-            request.form.get(f"pba_{m}") or "",
-            int(request.form.get(f"pba_qtd_{m}") or 0),
-            request.form.get(f"eja_alf_{m}") or "",
-            int(request.form.get(f"eja_alf_qtd_{m}") or 0),
-            request.form.get(f"eja_ai_{m}") or "",
-            int(request.form.get(f"eja_ai_qtd_{m}") or 0),
+
+            pba, pba_qtd,
+            eja_alf, eja_alf_qtd,
+            eja_ai, eja_ai_qtd,
+
             int(request.form.get(f"jan_{m}") or 0),
             int(request.form.get(f"fev_{m}") or 0),
             int(request.form.get(f"mar_{m}") or 0),
@@ -288,6 +233,7 @@ def salvar():
             int(request.form.get(f"jul_{m}") or 0),
             int(request.form.get(f"ago_{m}") or 0),
             int(request.form.get(f"setm_{m}") or 0),
+
             data_envio
         ))
 
@@ -302,7 +248,6 @@ def salvar():
 
     return redirect("/resumo_envio")
 
-
 # ================= RESUMO / FINALIZAÇÃO =================
 
 @app.route("/resumo_envio")
@@ -313,9 +258,11 @@ def resumo_envio():
 
     conn = conectar()
     cur = conn.cursor()
-    query = f"""
+    query = """
         SELECT municipio_nome, estado, formador_local,
-               pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+               pba, pba_qtd,
+               eja_alfabetizacao, eja_alfabetizacao_qtd,
+               eja_anos_iniciais, eja_anos_iniciais_qtd,
                jan, fev, mar, abr, mai, jun, jul, ago, setm,
                data_envio
         FROM respostas
@@ -333,20 +280,21 @@ def resumo_envio():
             "estado": r[1],
             "formador_local": r[2],
             "pba": r[3],
-            "eja_alf": r[4],
-            "eja_ai": r[5],
-            "meses": [r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14]],
-            "data": r[15].strftime("%d/%m/%Y %H:%M") if r[15] else ""
+            "pba_qtd": r[4],
+            "eja_alf": r[5],
+            "eja_alf_qtd": r[6],
+            "eja_ai": r[7],
+            "eja_ai_qtd": r[8],
+            "meses": [r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17]],
+            "data": r[18].strftime("%d/%m/%Y %H:%M") if r[18] else ""
         })
 
     return render_template("resumo_envio.html", dados=dados)
-
 
 @app.route("/finalizar_envio", methods=["POST"])
 def finalizar_envio():
     session.pop("ids_ultimo_envio", None)
     return render_template("mensagem_final.html")
-
 
 # ================= DASHBOARD =================
 
@@ -361,7 +309,9 @@ def dashboard():
     cur.execute("""
         SELECT 
             usuario_id, municipio_nome, estado, formador_local,
-            pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+            pba, pba_qtd,
+            eja_alfabetizacao, eja_alfabetizacao_qtd,
+            eja_anos_iniciais, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm,
             data_envio, municipio_id
         FROM respostas
@@ -376,21 +326,24 @@ def dashboard():
 
     for r in rows:
         meses = [
-            r[7] or 0, r[8] or 0, r[9] or 0, r[10] or 0, r[11] or 0,
-            r[12] or 0, r[13] or 0, r[14] or 0, r[15] or 0
+            r[10] or 0, r[11] or 0, r[12] or 0, r[13] or 0, r[14] or 0,
+            r[15] or 0, r[16] or 0, r[17] or 0, r[18] or 0
         ]
         dados.append({
             "formador": r[0],
             "municipio": r[1],
             "estado": r[2],
             "formador_local": r[3],
-            "pba": r[4] or 0,
-            "eja_alf": r[5] or 0,
-            "eja_ai": r[6] or 0,
+            "pba": r[4] or "",
+            "pba_qtd": r[5] or 0,
+            "eja_alf": r[6] or "",
+            "eja_alf_qtd": r[7] or 0,
+            "eja_ai": r[8] or "",
+            "eja_ai_qtd": r[9] or 0,
             "meses": meses,
             "total": sum(meses),
-            "data": r[16].strftime("%d/%m/%Y %H:%M") if r[16] else "",
-            "municipio_id": r[17]
+            "data": r[19].strftime("%d/%m/%Y %H:%M") if r[19] else "",
+            "municipio_id": r[20]
         })
         if r[2]:
             estados_set.add(r[2])
@@ -406,7 +359,6 @@ def dashboard():
         estados_lista=estados_lista,
         formadores_lista=formadores_lista
     )
-
 
 # ================= API DADOS INICIAIS (GRÁFICOS) =================
 
@@ -448,11 +400,9 @@ def dashboard_data():
         "meses": meses
     })
 
-
 # ================= MAPA BRASIL POR MÊS =================
 
 MESES_COLUNAS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "setm"]
-
 
 def coluna_mes_atual():
     mes_idx = datetime.now().month
@@ -462,20 +412,16 @@ def coluna_mes_atual():
         mes_idx = 9
     return MESES_COLUNAS[mes_idx - 1]
 
-
 @app.route("/api/mapa")
 def api_mapa():
     coluna = coluna_mes_atual()
     return _dados_mapa_por_coluna(coluna)
 
-
 @app.route("/api/mapa_mes/<coluna>")
 def api_mapa_mes(coluna):
     if coluna not in MESES_COLUNAS:
         return jsonify([])
-
     return _dados_mapa_por_coluna(coluna)
-
 
 def _dados_mapa_por_coluna(coluna):
     conn = conectar()
@@ -491,7 +437,6 @@ def _dados_mapa_por_coluna(coluna):
     dados = [{"uf": r[0], "total": r[1] or 0} for r in rows if r[0]]
     return jsonify(dados)
 
-
 # ================= API FILTROS =================
 
 @app.route("/api/filtrar", methods=["POST"])
@@ -505,13 +450,16 @@ def filtrar():
 
     municipio_id = None
     if municipio_raw:
+        # Pode ser só ID ou "ID|Nome"
         partes = municipio_raw.split("|", 1)
         municipio_id = partes[0]
 
     query = """
         SELECT 
             usuario_id, municipio_nome, estado, formador_local,
-            pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+            pba, pba_qtd,
+            eja_alfabetizacao, eja_alfabetizacao_qtd,
+            eja_anos_iniciais, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm,
             data_envio, municipio_id
         FROM respostas
@@ -548,16 +496,14 @@ def filtrar():
     conn.close()
 
     tabela = []
-    estados_totais = {}
-    meses_por_estado = {}
     pba_total = 0
     eja_alf_total = 0
     eja_ai_total = 0
 
     for r in rows:
         meses = [
-            r[7] or 0, r[8] or 0, r[9] or 0, r[10] or 0, r[11] or 0,
-            r[12] or 0, r[13] or 0, r[14] or 0, r[15] or 0
+            r[10] or 0, r[11] or 0, r[12] or 0, r[13] or 0, r[14] or 0,
+            r[15] or 0, r[16] or 0, r[17] or 0, r[18] or 0
         ]
         total_mes = sum(meses)
 
@@ -565,26 +511,20 @@ def filtrar():
             "formador": r[0],
             "municipio": r[1],
             "estado": r[2],
-            "pba": r[4] or 0,
-            "eja_alf": r[5] or 0,
-            "eja_ai": r[6] or 0,
-            "data": r[16].strftime("%d/%m/%Y %H:%M") if r[16] else "",
-            "municipio_id": r[17]
+            "formador_local": r[3],
+            "pba": r[4] or "",
+            "pba_qtd": r[5] or 0,
+            "eja_alf": r[6] or "",
+            "eja_alf_qtd": r[7] or 0,
+            "eja_ai": r[8] or "",
+            "eja_ai_qtd": r[9] or 0,
+            "data": r[19].strftime("%d/%m/%Y %H:%M") if r[19] else "",
+            "municipio_id": r[20]
         })
 
-        pba_total += r[4] or 0
-        eja_alf_total += r[5] or 0
-        eja_ai_total += r[6] or 0
-
-        uf = r[2]
-        if uf not in estados_totais:
-            estados_totais[uf] = 0
-        estados_totais[uf] += total_mes
-
-        if uf not in meses_por_estado:
-            meses_por_estado[uf] = [0] * 9
-        for i in range(9):
-            meses_por_estado[uf][i] += meses[i]
+        pba_total += r[5] or 0
+        eja_alf_total += r[7] or 0
+        eja_ai_total += r[9] or 0
 
     return jsonify({
         "tabela": tabela,
@@ -593,11 +533,8 @@ def filtrar():
             "eja_alf": eja_alf_total,
             "eja_ai": eja_ai_total,
             "geral": pba_total + eja_alf_total + eja_ai_total
-        },
-        "estados": estados_totais,
-        "meses": meses_por_estado
+        }
     })
-
 
 # ================= EXPORTAÇÃO EXCEL (GERAL) =================
 
@@ -625,7 +562,6 @@ def exportar_excel():
         download_name="dados.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
 
 # ================= EXPORTAÇÃO EXCEL POR MUNICÍPIO =================
 
@@ -662,7 +598,6 @@ def exportar_municipio(municipio_id):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-
 # ================= EXPORTAÇÃO PDF =================
 
 @app.route("/exportar_pdf")
@@ -693,8 +628,7 @@ def exportar_pdf():
         mimetype="application/pdf"
     )
 
-
-# ================= LIMPAR TODOS OS DADOS (APENAS TABELA RESPOSTAS) =================
+# ================= LIMPAR TODOS OS DADOS =================
 
 @app.route("/limpar_tudo", methods=["POST"])
 def limpar_tudo():
@@ -710,7 +644,6 @@ def limpar_tudo():
 
     return jsonify({"ok": True})
 
-
 # ================= CABEÇALHO DE RESPOSTA =================
 
 @app.after_request
@@ -718,6 +651,7 @@ def after_request(response):
     response.headers['X-Frame-Options'] = 'ALLOWALL'
     return response
 
+# ================= MAIN =================
 
 if __name__ == "__main__":
     app.run(debug=True)

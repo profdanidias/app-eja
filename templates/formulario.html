@@ -20,6 +20,9 @@
             min-height: 38px;
             padding: 4px;
         }
+        .mes-bloqueado {
+            background: #eee !important;
+        }
     </style>
 </head>
 
@@ -72,7 +75,7 @@
 
 <!-- ================= JAVASCRIPT ================= -->
 <script>
-    // Ativar Select2 no campo de municípios
+    // Ativar Select2
     $(document).ready(function() {
         $('#municipios').select2({
             placeholder: "Selecione os municípios",
@@ -102,7 +105,7 @@
             });
     });
 
-    // Criar campos dinâmicos para cada município selecionado (compatível com Select2)
+    // Criar campos dinâmicos para cada município selecionado
     $('#municipios').on('change', function () {
         const selecionados = $(this).select2('data');
         const area = document.getElementById("areaMunicipios");
@@ -112,6 +115,17 @@
         selecionados.forEach(item => {
             const id = item.id;
             const nome = item.text;
+
+            // Gerar meses até o mês atual
+            const meses = ["jan","fev","mar","abr","mai","jun","jul","ago","setm"];
+            const mesAtual = new Date().getMonth(); // 0 = jan
+
+            const camposMeses = meses.slice(0, mesAtual + 1).map(m => `
+                <div class="col-4 col-md-2 mb-2">
+                    <label class="form-label text-capitalize">${m}</label>
+                    <input type="number" name="${m}_${id}" class="form-control campo-mes" min="0">
+                </div>
+            `).join("");
 
             area.innerHTML += `
                 <div class="card shadow p-3 mb-4">
@@ -190,62 +204,85 @@
 
                     <hr>
 
-                    <h6>Participantes por mês</h6>
+                    <h6>Número Total de Participantes em Formações Presenciais</h6>
 
                     <div class="row mt-2">
-                        ${["jan","fev","mar","abr","mai","jun","jul","ago","setm"].map(m => `
-                            <div class="col-4 col-md-2 mb-2">
-                                <label class="form-label text-capitalize">${m}</label>
-                                <input type="number" name="${m}_${id}" class="form-control campo-mes" min="0">
-                            </div>
-                        `).join("")}
+                        ${camposMeses}
                     </div>
                 </div>
             `;
+
+            carregarDadosAnteriores(id);
         });
 
-        // Ativar lógica condicional após inserir os campos
         ativarLogicaCondicional();
     });
 
     // Função que ativa a lógica dos campos condicionais
     function ativarLogicaCondicional() {
 
-        // PBA
         $(".pba-select").on("change", function () {
             const id = $(this).data("id");
             const qtd = $(`input[name='pba_qtd_${id}']`);
 
-            if ($(this).val() === "Sim") {
-                qtd.prop("readonly", false);
-            } else {
-                qtd.val(0).prop("readonly", true);
-            }
+            if ($(this).val() === "Sim") qtd.prop("readonly", false);
+            else qtd.val(0).prop("readonly", true);
         });
 
-        // Alfabetização EJA
         $(".eja-alf-select").on("change", function () {
             const id = $(this).data("id");
             const qtd = $(`input[name='eja_alf_qtd_${id}']`);
 
-            if ($(this).val() === "Sim") {
-                qtd.prop("readonly", false);
-            } else {
-                qtd.val(0).prop("readonly", true);
-            }
+            if ($(this).val() === "Sim") qtd.prop("readonly", false);
+            else qtd.val(0).prop("readonly", true);
         });
 
-        // EJA Anos Iniciais
         $(".eja-ai-select").on("change", function () {
             const id = $(this).data("id");
             const qtd = $(`input[name='eja_ai_qtd_${id}']`);
 
-            if ($(this).val() === "Sim") {
-                qtd.prop("readonly", false);
-            } else {
-                qtd.val(0).prop("readonly", true);
-            }
+            if ($(this).val() === "Sim") qtd.prop("readonly", false);
+            else qtd.val(0).prop("readonly", true);
         });
+    }
+
+    // Preencher automaticamente dados anteriores
+    function carregarDadosAnteriores(id) {
+        fetch("/api/dados_municipio/" + id)
+            .then(r => r.json())
+            .then(d => {
+                if (!d.existe) return;
+
+                // Formador local
+                $(`select[name='formador_local_${id}']`).val(d.formador_local);
+
+                // PBA
+                $(`select[name='pba_${id}']`).val(d.pba).trigger("change");
+                $(`input[name='pba_qtd_${id}']`).val(d.pba_qtd);
+
+                // Alfabetização EJA
+                $(`select[name='eja_alf_${id}']`).val(d.eja_alf).trigger("change");
+                $(`input[name='eja_alf_qtd_${id}']`).val(d.eja_alf_qtd);
+
+                // EJA Anos Iniciais
+                $(`select[name='eja_ai_${id}']`).val(d.eja_ai).trigger("change");
+                $(`input[name='eja_ai_qtd_${id}']`).val(d.eja_ai_qtd);
+
+                // Meses
+                const ordem = ["jan","fev","mar","abr","mai","jun","jul","ago","setm"];
+
+                Object.entries(d.meses).forEach(([mes, valor]) => {
+                    const campo = $(`input[name='${mes}_${id}']`);
+                    campo.val(valor);
+
+                    const indiceMes = ordem.indexOf(mes);
+
+                    // Travar meses anteriores ao mês atual
+                    if (indiceMes + 1 < d.mes_atual) {
+                        campo.prop("readonly", true).addClass("mes-bloqueado");
+                    }
+                });
+            });
     }
 </script>
 
