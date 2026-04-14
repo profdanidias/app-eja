@@ -273,22 +273,29 @@ def api_mapa():
     return jsonify(dados)
 
 
-# ================= API FILTROS (TABELA + CARDS + GRÁFICOS + MAPA) =================
+# ================= API FILTROS =================
 @app.route("/api/filtrar", methods=["POST"])
 def filtrar():
 
     filtros = request.json
     estado = filtros.get("estado")
     formador = filtros.get("formador")
+    municipio_raw = filtros.get("municipio")
     data_ini = filtros.get("data_ini")
     data_fim = filtros.get("data_fim")
+
+    municipio_id = None
+    if municipio_raw:
+        # formato "ID|Nome"
+        partes = municipio_raw.split("|", 1)
+        municipio_id = partes[0]
 
     query = """
         SELECT 
             usuario_id, municipio_nome, estado, formador_local,
             pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm,
-            data_envio
+            data_envio, municipio_id
         FROM respostas
         WHERE 1=1
     """
@@ -302,6 +309,10 @@ def filtrar():
     if formador:
         query += " AND usuario_id = ?"
         params.append(formador)
+
+    if municipio_id:
+        query += " AND municipio_id = ?"
+        params.append(municipio_id)
 
     if data_ini:
         query += " AND date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) >= date(?)"
