@@ -53,6 +53,14 @@
 
 </form>
 
+{% if is_gestor %}
+    <br><br>
+    <button type="button" onclick="abrirPainelAdmin()" 
+            style="background:#333;color:white;padding:10px 20px;border:none;border-radius:6px;">
+        Painel Admin
+    </button>
+{% endif %}
+
 </div>
 
 <script>
@@ -339,7 +347,15 @@ function removerMunicipio(id){
         if (o.value==id) o.selected=false;
     });
 }
+function abrirPainelAdmin(){
+    let senha = prompt("Digite a senha de acesso ao Painel Admin:");
 
+    if (senha === "PactoBrasilPelaEJA"){
+        window.location.href = "/dashboard";
+    } else if (senha !== null){
+        alert("Senha incorreta.");
+    }
+}
 </script>
 
 </body>
