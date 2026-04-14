@@ -68,6 +68,8 @@ def obter_estado_fixo(email):
 
 
 def definir_estado_fixo(email, estado):
+    if not email or not estado:
+        return
     conn = conectar()
     cur = conn.cursor()
     cur.execute("""
@@ -79,7 +81,7 @@ def definir_estado_fixo(email, estado):
     conn.close()
 
 
-# ================= LOGIN =================
+# ================= LOGIN / PERFIL =================
 @app.route("/")
 def auto_login():
     nome = request.args.get("nome")
@@ -137,7 +139,7 @@ def municipios(uf):
     ).json())
 
 
-# ================= SALVAR =================
+# ================= SALVAR FORMULÁRIO =================
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
@@ -200,7 +202,7 @@ def salvar():
     return redirect("/resumo_envio")
 
 
-# ================= RESUMO =================
+# ================= RESUMO DO ENVIO =================
 @app.route("/resumo_envio")
 def resumo_envio():
     ids = session.get("ids_ultimo_envio")
@@ -230,6 +232,146 @@ def resumo_envio():
             "pba": r[3],
             "eja_alf": r[4],
             "eja_ai": r[5],
-            "meses": [r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14]],
+            "meses": [r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14]],
             "data": r[15]
         })
+
+    return render_template("resumo_envio.html", dados=dados)
+
+
+@app.route("/finalizar_envio", methods=["POST"])
+def finalizar_envio():
+    session.pop("ids_ultimo_envio", None)
+    return render_template("mensagem_final.html")
+
+
+# ================= DASHBOARD (APENAS GESTOR) =================
+@app.route("/dashboard")
+def dashboard():
+
+    if session.get("email") not in GESTORES:
+        return "Acesso negado"
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            usuario_id, municipio_nome, estado, formador_local,
+            pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+            jan, fev, mar, abr, mai, jun, jul, ago, setm,
+            data_envio
+        FROM respostas
+        ORDER BY 
+            date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
+            time(substr(data_envio,12)) DESC
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    dados = []
+    estados_set = set()
+    formadores_set = set()
+
+    for r in rows:
+        meses = [
+            r[7] or 0, r[8] or 0, r[9] or 0, r[10] or 0, r[11] or 0,
+            r[12] or 0, r[13] or 0, r[14] or 0, r[15] or 0
+        ]
+        dados.append({
+            "formador": r[0],
+            "municipio": r[1],
+            "estado": r[2],
+            "formador_local": r[3],
+            "pba": r[4] or 0,
+            "eja_alf": r[5] or 0,
+            "eja_ai": r[6] or 0,
+            "meses": meses,
+            "total": sum(meses),
+            "data": r[16]
+        })
+        estados_set.add(r[2])
+        formadores_set.add(r[0])
+
+    estados_lista = sorted([e for e in estados_set if e])
+    formadores_lista = sorted([f for f in formadores_set if f])
+
+    return render_template(
+        "dashboard.html",
+        dados=dados,
+        estados_lista=estados_lista,
+        formadores_lista=formadores_lista
+    )
+
+
+# ================= EXPORTAÇÕES (GESTOR) =================
+@app.route("/exportar_excel")
+def exportar_excel():
+
+    if session.get("email") not in GESTORES:
+        return "Acesso negado"
+
+    conn = conectar()
+    df = pd.read_sql_query("""
+        SELECT *
+        FROM respostas
+        ORDER BY 
+            date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
+            time(substr(data_envio,12)) DESC
+    """, conn)
+    conn.close()
+
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="dados.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@app.route("/exportar_pdf")
+def exportar_pdf():
+
+    if session.get("email") not in GESTORES:
+        return "Acesso negado"
+
+    conn = conectar()
+    df = pd.read_sql_query("""
+        SELECT *
+        FROM respostas
+        ORDER BY 
+            date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
+            time(substr(data_envio,12)) DESC
+    """, conn)
+    conn.close()
+
+    output = io.BytesIO()
+    pdf = SimpleDocTemplate(output, pagesize=letter)
+
+    tabela = [df.columns.tolist()] + df.values.tolist()
+
+    pdf.build([Table(tabela)])
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="dados.pdf",
+        mimetype="application/pdf"
+    )
+
+
+# ================= CABEÇALHO DE RESPOSTA =================
+@app.after_request
+def after_request(response):
+    response.headers['X-Frame-Options'] = 'ALLOWALL'
+    return response
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
