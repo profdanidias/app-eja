@@ -80,12 +80,13 @@ def listar_municipios_por_uf(uf):
 
 # ================= LOGIN =================
 
-@app.route("/", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        session["nome"] = request.form.get("nome")
-        session["email"] = request.form.get("email")
+@app.route("/")
+def index():
+    # Se já está logada, vai direto para o formulário
+    if "email" in session:
         return redirect("/formulario")
+
+    # Se não está logada, mostra a tela de boas-vindas
     return render_template("login.html")
 
 # ================= FORMULÁRIO =================
