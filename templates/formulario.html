@@ -34,7 +34,7 @@
 <br><br>
 
 <label><b>Municípios (pode selecionar vários):</b></label><br>
-<select id="municipios" multiple size="8" name="municipios"></select>
+<select id="municipios" multiple size="8" name="municipios_select"></select>
 
 <br><br>
 
@@ -175,6 +175,8 @@ document.getElementById("estado").addEventListener("change", function(){
     .then(muns=>{
         let select=document.getElementById("municipios");
         select.innerHTML="";
+        selecionados.clear();
+        document.getElementById("blocos").innerHTML = "";
         muns.forEach(m=>{
             let opt=document.createElement("option");
             opt.value=m.id;
@@ -252,6 +254,8 @@ document.getElementById("municipios").addEventListener("change", function(){
 
             <button type="button" onclick="removerMunicipio('${id}')">RETIRAR MUNICÍPIO</button><br><br>
 
+            <!-- município incluído explicitamente no POST -->
+            <input type="hidden" name="municipios" value="${id}">
             <input type="hidden" name="nome_${id}" value="${nome}">
 
             Há Formador Local?
