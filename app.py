@@ -14,7 +14,7 @@ app = Flask(__name__)
 app.secret_key = "SUA_SECRET_KEY_AQUI"
 
 @app.before_request
-def permitir_login_temporario():
+def controle_de_acesso():
     # 1. Permitir login via URL (Moodle → app)
     nome = request.args.get("nome")
     email = request.args.get("email")
@@ -22,7 +22,7 @@ def permitir_login_temporario():
     if nome and email:
         session["nome"] = nome
         session["email"] = email
-        return  # segue para a rota normalmente
+        return  # segue normalmente
 
     # 2. Se já está logada, segue
     if "email" in session:
@@ -30,7 +30,8 @@ def permitir_login_temporario():
 
     # 3. Rotas que NÃO exigem login
     rotas_livres = [
-        "/", "/login", "/lti/init", "/lti/login", "/lti/jwks",
+        "/", "/login",
+        "/lti/init", "/lti/login", "/lti/jwks",
         "/static", "/favicon.ico"
     ]
 
@@ -38,81 +39,6 @@ def permitir_login_temporario():
         return
 
     # 4. Se não está logada e não é rota livre → volta para /
-    return redirect("/")
-
-@app.before_request
-def permitir_login_temporario():
-    # 1. Permitir login via URL para testes
-    nome = request.args.get("nome")
-    email = request.args.get("email")
-
-    if nome and email:
-        session["nome"] = nome
-        session["email"] = email
-        return
-
-    # 2. Se já está logada, segue normalmente
-    if "email" in session:
-        return
-
-    # 3. Permitir acesso às rotas públicas
-    rotas_livres = [
-        "/", "/login", "/lti/init", "/lti/login", "/lti/jwks",
-        "/static", "/favicon.ico"
-    ]
-
-    if any(request.path.startswith(r) for r in rotas_livres):
-        return
-
-    # 4. Se não está logada e não é rota pública → manda para /
-    return redirect("/")
-
-
-@app.before_request
-def permitir_login_temporario():
-    # 1. Permitir login via URL para testes
-    nome = request.args.get("nome")
-    email = request.args.get("email")
-
-    if nome and email:
-        session["nome"] = nome
-        session["email"] = email
-        return
-
-    # 2. Se já está logada, segue normalmente
-    if "email" in session:
-        return
-
-    # 3. Permitir acesso às rotas públicas
-    rotas_livres = [
-        "/", "/login", "/lti/init", "/lti/login", "/lti/jwks",
-        "/static", "/favicon.ico"
-    ]
-
-    if any(request.path.startswith(r) for r in rotas_livres):
-        return
-
-    # 4. Se não está logada e não é rota pública → manda para /
-    return redirect("/")
-
-@app.before_request
-def garantir_login():
-    # Permitir acesso às rotas públicas
-    rotas_livres = {"/", "/login", "/static", "/favicon.ico"}
-    if request.path.startswith("/static"):
-        return
-
-    # Se já está logado, segue
-    if "email" in session:
-        return
-
-    # Se o Moodle enviou dados via POST
-    if request.method == "POST" and "email" in request.form:
-        session["email"] = request.form.get("email")
-        session["nome"] = request.form.get("nome")
-        return
-
-    # Caso contrário, manda para o login
     return redirect("/")
 
 # ================= CONFIGURAÇÃO DO POSTGRES =================
