@@ -159,13 +159,12 @@ def dashboard():
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT 
-        usuario_id, municipio_nome, estado, formador_local,
-        pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
-        COALESCE(jan,0)+COALESCE(fev,0)+COALESCE(mar,0)+COALESCE(abr,0)+
-        COALESCE(mai,0)+COALESCE(jun,0)+COALESCE(jul,0)+COALESCE(ago,0)+COALESCE(setm,0),
-        data_envio
-    FROM respostas
+        SELECT 
+            usuario_id, municipio_nome, estado, formador_local,
+            pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+            jan, fev, mar, abr, mai, jun, jul, ago, setm,
+            data_envio
+        FROM respostas
     """)
 
     rows = cur.fetchall()
@@ -181,11 +180,56 @@ def dashboard():
             "pba": r[4] or 0,
             "eja_alf": r[5] or 0,
             "eja_ai": r[6] or 0,
-            "total": r[7] or 0,
-            "data": r[8]
+            "meses": [
+                r[7] or 0, r[8] or 0, r[9] or 0, r[10] or 0, r[11] or 0,
+                r[12] or 0, r[13] or 0, r[14] or 0, r[15] or 0
+            ],
+            "data": r[16]
         })
 
     return render_template("dashboard.html", dados=dados)
+
+# ============= ENDPOINT ALIMENTAR OS GRÁFICOS
+@app.route("/api/dashboard_data")
+def dashboard_data():
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT estado,
+               SUM(pba_qtd),
+               SUM(eja_alfabetizacao_qtd),
+               SUM(eja_anos_iniciais_qtd),
+               SUM(jan), SUM(fev), SUM(mar), SUM(abr), SUM(mai),
+               SUM(jun), SUM(jul), SUM(ago), SUM(setm)
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    estados = []
+    pba = []
+    eja_alf = []
+    eja_ai = []
+    meses = []
+
+    for r in rows:
+        estados.append(r[0])
+        pba.append(r[1] or 0)
+        eja_alf.append(r[2] or 0)
+        eja_ai.append(r[3] or 0)
+        meses.append([x or 0 for x in r[4:]])
+
+    return jsonify({
+        "estados": estados,
+        "pba": pba,
+        "eja_alf": eja_alf,
+        "eja_ai": eja_ai,
+        "meses": meses
+    })
 
 
 @app.after_request
