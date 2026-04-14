@@ -2,15 +2,17 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Dashboard EJA - Completo</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4"></script>
+<title>Dashboard EJA</title>
 
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:20px; }
-.card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
+
+.card {
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    margin-bottom:20px;
+}
 
 .grid {
     display:grid;
@@ -19,7 +21,22 @@ body { font-family: Arial; background:#f4f6f9; margin:20px; }
 }
 
 select, input { padding:6px; width:100%; }
-button { padding:8px 12px; margin-top:10px; cursor:pointer; }
+
+button {
+    padding:8px 12px;
+    margin-top:10px;
+    cursor:pointer;
+}
+
+.estado {
+    fill:#ddd;
+    stroke:#999;
+    cursor:pointer;
+}
+
+.estado:hover {
+    fill:#66b3ff;
+}
 </style>
 </head>
 
@@ -27,6 +44,7 @@ button { padding:8px 12px; margin-top:10px; cursor:pointer; }
 
 <h2>📊 Dashboard Nacional EJA</h2>
 
+<!-- FILTROS -->
 <div class="card">
 
 <h3>Filtros</h3>
@@ -59,12 +77,16 @@ button { padding:8px 12px; margin-top:10px; cursor:pointer; }
 
 </div>
 
+<!-- MAPA SIMPLES FUNCIONAL -->
 <div class="card">
-<h3>🗺️ Mapa do Brasil</h3>
-<canvas id="mapa"></canvas>
+<h3>🗺️ Estados (clique para filtrar)</h3>
+
+<div id="mapaEstados"></div>
 <p id="estadoSelecionado"></p>
+
 </div>
 
+<!-- TABELA -->
 <div class="card">
 <h3>📋 Municípios</h3>
 <table border="1" width="100%" id="tabela"></table>
@@ -73,16 +95,16 @@ button { padding:8px 12px; margin-top:10px; cursor:pointer; }
 <script>
 
 const dados = {{ dados | tojson }};
+
+// IMPORTANTE: base completa
+let dadosBase = [...dados];
 let dadosFiltrados = [...dados];
 
-let geoData;
-let chart;
-
-
-// ================= FILTROS =================
+// ================= PREENCHER FILTROS =================
 function preencher(id, campo){
-    let set = new Set(dados.map(d=>d[campo]));
+    let set = new Set(dadosBase.map(d=>d[campo]));
     let el = document.getElementById(id);
+
     set.forEach(v=>{
         if(v) el.innerHTML += `<option value="${v}">${v}</option>`;
     });
@@ -92,9 +114,9 @@ preencher("estado","estado");
 preencher("municipio","municipio");
 preencher("formador","formador");
 
-
 // ================= TABELA =================
 function render(lista){
+
     let t = document.getElementById("tabela");
 
     if(lista.length === 0){
@@ -123,13 +145,15 @@ function render(lista){
     });
 }
 
-render(dados);
+// MOSTRA TODOS AO INICIAR
+render(dadosBase);
 
 
-// ================= FILTRO =================
+// ================= FILTROS =================
 function filtrar(){
 
-    dadosFiltrados = dados.filter(d=>{
+    dadosFiltrados = dadosBase.filter(d => {
+
         return (!estado.value || d.estado === estado.value)
         && (!municipio.value || d.municipio === municipio.value)
         && (!formador.value || d.formador === formador.value)
@@ -141,87 +165,39 @@ function filtrar(){
     });
 
     render(dadosFiltrados);
-    atualizarMapa();
 }
+
+
+// ================= MAPA SIMPLES =================
+function criarMapa(){
+
+    let estados = [...new Set(dadosBase.map(d=>d.estado))];
+
+    let div = document.getElementById("mapaEstados");
+
+    estados.forEach(est => {
+
+        let btn = document.createElement("button");
+
+        btn.innerText = est;
+        btn.onclick = () => {
+
+            document.getElementById("estado").value = est;
+            document.getElementById("estadoSelecionado").innerText =
+                "Estado selecionado: " + est;
+
+            filtrar();
+        };
+
+        div.appendChild(btn);
+    });
+}
+
+criarMapa();
 
 function limpar(){
     location.reload();
 }
-
-
-// ================= MAPA =================
-async function carregarMapa(){
-
-    const res = await fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson");
-    geoData = await res.json();
-
-    atualizarMapa();
-}
-
-function calcularTotais(){
-    let mapa = {};
-    dadosFiltrados.forEach(d=>{
-        mapa[d.estado] = (mapa[d.estado] || 0) + d.total;
-    });
-    return mapa;
-}
-
-function atualizarMapa(){
-
-    if(!geoData) return;
-
-    let totais = calcularTotais();
-
-    const features = geoData.features.map(f=>{
-        let nome = f.properties.name;
-
-        return {
-            feature: f,
-            value: totais[nome] || 0
-        };
-    });
-
-    if(chart) chart.destroy();
-
-    chart = new Chart(document.getElementById("mapa"), {
-        type: "choropleth",
-        data: {
-            labels: geoData.features.map(f=>f.properties.name),
-            datasets: [{
-                label: "Participantes",
-                data: features
-            }]
-        },
-        options: {
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: ctx => {
-                            let nome = ctx.raw.feature.properties.name;
-                            let valor = ctx.raw.value;
-                            return `${nome}: ${valor || "Dados não enviados"}`;
-                        }
-                    }
-                }
-            },
-            onClick: (evt, elements) => {
-
-                if(elements.length){
-                    let estadoSel = geoData.features[elements[0].index].properties.name;
-
-                    document.getElementById("estadoSelecionado").innerText =
-                        "Estado selecionado: " + estadoSel;
-
-                    document.getElementById("estado").value = estadoSel;
-
-                    filtrar();
-                }
-            }
-        }
-    });
-}
-
-carregarMapa();
 
 </script>
 
