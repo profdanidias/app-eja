@@ -1,205 +1,167 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>Dashboard EJA</title>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
 
-<style>
-body { font-family: Arial; background:#f4f6f9; margin:20px; }
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 
-.card {
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    margin-bottom:20px;
-}
+    <!-- DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
 
-.grid {
-    display:grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap:10px;
-}
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-select, input { padding:6px; width:100%; }
-
-button {
-    padding:8px 12px;
-    margin-top:10px;
-    cursor:pointer;
-}
-
-.estado {
-    fill:#ddd;
-    stroke:#999;
-    cursor:pointer;
-}
-
-.estado:hover {
-    fill:#66b3ff;
-}
-</style>
+    <style>
+        body { background: #f5f6fa; }
+        .card { border-radius: 12px; }
+        .chart-container { height: 350px; }
+    </style>
 </head>
 
-<body>
+<body class="p-4">
 
-<h2>📊 Dashboard Nacional EJA</h2>
+    <h2 class="mb-4">📊 Dashboard de Monitoramento</h2>
 
-<!-- FILTROS -->
-<div class="card">
+    <!-- ================= CARDS ================= -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total Geral</h5>
+                <h2 id="totalGeral">0</h2>
+            </div>
+        </div>
 
-<h3>Filtros</h3>
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total PBA</h5>
+                <h2 id="totalPBA">0</h2>
+            </div>
+        </div>
 
-<div class="grid">
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total EJA Alfabetização</h5>
+                <h2 id="totalEJAAlf">0</h2>
+            </div>
+        </div>
 
-<select id="estado"><option value="">Estado</option></select>
-<select id="municipio"><option value="">Município</option></select>
-<select id="formador"><option value="">Formador</option></select>
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total EJA Anos Iniciais</h5>
+                <h2 id="totalEJAAI">0</h2>
+            </div>
+        </div>
+    </div>
 
-<select id="formadorLocal">
-<option value="">Formador Local</option>
-<option value="sim">Sim</option>
-<option value="não">Não</option>
-<option value="não identificado">Não identificado</option>
-</select>
+    <!-- ================= GRÁFICOS ================= -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow p-3 mb-4">
+                <h5>Total por Estado</h5>
+                <div class="chart-container">
+                    <canvas id="graficoEstados"></canvas>
+                </div>
+            </div>
+        </div>
 
-<input id="pba" type="number" min="0" placeholder="PBA ≥">
-<input id="ejaalf" type="number" min="0" placeholder="EJA Alf ≥">
-<input id="ejaai" type="number" min="0" placeholder="EJA AI ≥">
-<input id="total" type="number" min="0" placeholder="Participantes ≥">
+        <div class="col-md-6">
+            <div class="card shadow p-3 mb-4">
+                <h5>Distribuição por Programa</h5>
+                <div class="chart-container">
+                    <canvas id="graficoProgramas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 
-</div>
+    <!-- ================= TABELA ================= -->
+    <div class="card shadow p-3 mt-4">
+        <h5>Registros Detalhados</h5>
+        <table id="tabela" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Formador</th>
+                    <th>Município</th>
+                    <th>Estado</th>
+                    <th>PBA</th>
+                    <th>EJA Alf.</th>
+                    <th>EJA AI</th>
+                    <th>Total Meses</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in dados %}
+                <tr>
+                    <td>{{ d.formador }}</td>
+                    <td>{{ d.municipio }}</td>
+                    <td>{{ d.estado }}</td>
+                    <td>{{ d.pba }}</td>
+                    <td>{{ d.eja_alf }}</td>
+                    <td>{{ d.eja_ai }}</td>
+                    <td>{{ d.meses | sum }}</td>
+                    <td>{{ d.data }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-<button onclick="filtrar()">Aplicar filtros</button>
-<button onclick="limpar()">Limpar</button>
+    <!-- JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 
-<a href="/exportar_excel"><button>Exportar Excel</button></a>
-<a href="/exportar_pdf"><button>Exportar PDF</button></a>
+    <script>
+        $(document).ready(function () {
+            $('#tabela').DataTable();
 
-</div>
+            fetch("/api/dashboard_data")
+                .then(r => r.json())
+                .then(data => montarDashboard(data));
+        });
 
-<!-- MAPA SIMPLES FUNCIONAL -->
-<div class="card">
-<h3>🗺️ Estados (clique para filtrar)</h3>
+        function montarDashboard(data) {
 
-<div id="mapaEstados"></div>
-<p id="estadoSelecionado"></p>
+            // ======== CARDS ========
+            const totalPBA = data.pba.reduce((a,b)=>a+b,0);
+            const totalEJAAlf = data.eja_alf.reduce((a,b)=>a+b,0);
+            const totalEJAAI = data.eja_ai.reduce((a,b)=>a+b,0);
+            const totalGeral = totalPBA + totalEJAAlf + totalEJAAI;
 
-</div>
+            document.getElementById("totalPBA").innerText = totalPBA;
+            document.getElementById("totalEJAAlf").innerText = totalEJAAlf;
+            document.getElementById("totalEJAAI").innerText = totalEJAAI;
+            document.getElementById("totalGeral").innerText = totalGeral;
 
-<!-- TABELA -->
-<div class="card">
-<h3>📋 Municípios</h3>
-<table border="1" width="100%" id="tabela"></table>
-</div>
+            // ======== GRÁFICO ESTADOS ========
+            new Chart(document.getElementById("graficoEstados"), {
+                type: "bar",
+                data: {
+                    labels: data.estados,
+                    datasets: [{
+                        label: "Total Geral",
+                        data: data.pba.map((v,i)=>v + data.eja_alf[i] + data.eja_ai[i]),
+                        backgroundColor: "#4e73df"
+                    }]
+                }
+            });
 
-<script>
-
-const dados = {{ dados | tojson }};
-
-// IMPORTANTE: base completa
-let dadosBase = [...dados];
-let dadosFiltrados = [...dados];
-
-// ================= PREENCHER FILTROS =================
-function preencher(id, campo){
-    let set = new Set(dadosBase.map(d=>d[campo]));
-    let el = document.getElementById(id);
-
-    set.forEach(v=>{
-        if(v) el.innerHTML += `<option value="${v}">${v}</option>`;
-    });
-}
-
-preencher("estado","estado");
-preencher("municipio","municipio");
-preencher("formador","formador");
-
-// ================= TABELA =================
-function render(lista){
-
-    let t = document.getElementById("tabela");
-
-    if(lista.length === 0){
-        t.innerHTML = "<tr><td>📌 Dados não enviados</td></tr>";
-        return;
-    }
-
-    t.innerHTML = `
-    <tr>
-        <th>Município</th>
-        <th>Estado</th>
-        <th>Formador</th>
-        <th>Data</th>
-        <th>Total</th>
-    </tr>`;
-
-    lista.forEach(d=>{
-        t.innerHTML += `
-        <tr>
-            <td>${d.municipio}</td>
-            <td>${d.estado}</td>
-            <td>${d.formador}</td>
-            <td>${d.data}</td>
-            <td>${d.total}</td>
-        </tr>`;
-    });
-}
-
-// MOSTRA TODOS AO INICIAR
-render(dadosBase);
-
-
-// ================= FILTROS =================
-function filtrar(){
-
-    dadosFiltrados = dadosBase.filter(d => {
-
-        return (!estado.value || d.estado === estado.value)
-        && (!municipio.value || d.municipio === municipio.value)
-        && (!formador.value || d.formador === formador.value)
-        && (!formadorLocal.value || d.formador_local === formadorLocal.value)
-        && (d.pba >= (pba.value || 0))
-        && (d.eja_alf >= (ejaalf.value || 0))
-        && (d.eja_ai >= (ejaai.value || 0))
-        && (d.total >= (total.value || 0));
-    });
-
-    render(dadosFiltrados);
-}
-
-
-// ================= MAPA SIMPLES =================
-function criarMapa(){
-
-    let estados = [...new Set(dadosBase.map(d=>d.estado))];
-
-    let div = document.getElementById("mapaEstados");
-
-    estados.forEach(est => {
-
-        let btn = document.createElement("button");
-
-        btn.innerText = est;
-        btn.onclick = () => {
-
-            document.getElementById("estado").value = est;
-            document.getElementById("estadoSelecionado").innerText =
-                "Estado selecionado: " + est;
-
-            filtrar();
-        };
-
-        div.appendChild(btn);
-    });
-}
-
-criarMapa();
-
-function limpar(){
-    location.reload();
-}
-
-</script>
+            // ======== GRÁFICO PROGRAMAS ========
+            new Chart(document.getElementById("graficoProgramas"), {
+                type: "pie",
+                data: {
+                    labels: ["PBA", "EJA Alf.", "EJA AI"],
+                    datasets: [{
+                        data: [totalPBA, totalEJAAlf, totalEJAAI],
+                        backgroundColor: ["#1cc88a", "#36b9cc", "#f6c23e"]
+                    }]
+                }
+            });
+        }
+    </script>
 
 </body>
 </html>
