@@ -26,11 +26,21 @@
 
 <body class="p-4">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>📊 Dashboard de Monitoramento</h2>
-        <div>
-            <a href="/exportar_excel" class="btn btn-success btn-sm me-2">Exportar Excel</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+
+        <h2 class="m-0">📊 Dashboard de Monitoramento</h2>
+
+        <div class="d-flex flex-wrap gap-2">
+
+            <a href="/exportar_excel" class="btn btn-success btn-sm">Exportar Excel</a>
             <a href="/exportar_pdf" class="btn btn-danger btn-sm">Exportar PDF</a>
+
+            {% if session.email in GESTORES %}
+            <button class="btn btn-warning btn-sm" onclick="confirmarLimpeza()">
+                Limpar todos os dados
+            </button>
+            {% endif %}
+
         </div>
     </div>
 
@@ -66,4 +76,426 @@
                 </select>
             </div>
 
-           
+            <div class="col-md-3">
+                <label>Data Inicial</label>
+                <input type="date" id="filtroDataIni" class="form-control">
+            </div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col-md-3">
+                <label>Data Final</label>
+                <input type="date" id="filtroDataFim" class="form-control">
+            </div>
+        </div>
+
+        <button class="btn btn-primary mt-3" onclick="aplicarFiltros()">Aplicar Filtros</button>
+    </div>
+
+    <!-- ================= CARDS ================= -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total de turmas PBA</h5>
+                <h2 id="totalPBA">0</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total de turmas EJA Alfabetização</h5>
+                <h2 id="totalEJAAlf">0</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total de turmas EJA Anos Iniciais</h5>
+                <h2 id="totalEJAAI">0</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total Geral de Turmas</h5>
+                <h2 id="totalGeral">0</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= GRÁFICOS ================= -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow p-3 mb-4">
+                <h5>Total de Turmas por Estado</h5>
+                <div class="chart-container">
+                    <canvas id="graficoEstados"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow p-3 mb-4">
+                <h5>Distribuição de Turmas por Programa</h5>
+                <div class="chart-container">
+                    <canvas id="graficoProgramas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= GRÁFICO LINHA ================= -->
+    <div class="card shadow p-3 mb-4">
+        <h5>Movimento de participantes por mês (por estado)</h5>
+        <div class="chart-container">
+            <canvas id="graficoLinha"></canvas>
+        </div>
+    </div>
+
+    <!-- ================= MAPA BRASIL ================= -->
+    <div class="card shadow p-3 mb-4">
+        <h5>Mapa do Brasil – Participantes por Estado (por mês)</h5>
+
+        <div class="text-center mb-3">
+            <label for="filtroMesMapa" class="me-2"><b>Mês:</b></label>
+            <select id="filtroMesMapa" class="form-select d-inline-block w-auto">
+                <option value="jan">Janeiro</option>
+                <option value="fev">Fevereiro</option>
+                <option value="mar">Março</option>
+                <option value="abr">Abril</option>
+                <option value="mai">Maio</option>
+                <option value="jun">Junho</option>
+                <option value="jul">Julho</option>
+                <option value="ago">Agosto</option>
+                <option value="setm">Setembro</option>
+            </select>
+        </div>
+
+        <div id="mapaBrasil" style="height: 500px;"></div>
+    </div>
+
+    <!-- ================= TABELA ================= -->
+    <div class="card shadow p-3 mt-4">
+        <h5>Registros Detalhados</h5>
+
+        <table id="tabela" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Formador</th>
+                    <th>Município</th>
+                    <th>Estado</th>
+                    <th>Turmas PBA</th>
+                    <th>Turmas EJA Alf.</th>
+                    <th>Turmas EJA AI</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for d in dados %}
+                <tr>
+                    <td>{{ d.formador }}</td>
+                    <td>{{ d.municipio }}</td>
+                    <td>{{ d.estado }}</td>
+                    <td>{{ d.pba }}</td>
+                    <td>{{ d.eja_alf }}</td>
+                    <td>{{ d.eja_ai }}</td>
+                    <td>{{ d.data }}</td>
+                    <td>
+                        <a href="/exportar_municipio/{{ d.municipio_id }}" 
+                           class="btn btn-primary btn-sm">
+                           REGISTROS DO MUNICÍPIO
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        let tabela;
+        let graficoEstados;
+        let graficoProgramas;
+        let graficoLinha;
+        let mapaBrasil;
+
+        const MESES_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"];
+        const MESES_COLUNAS = ["jan","fev","mar","abr","mai","jun","jul","ago","setm"];
+
+        $(document).ready(function () {
+
+            tabela = $('#tabela').DataTable();
+
+            fetch("/api/dashboard_data")
+                .then(r => r.json())
+                .then(data => montarDashboard(data));
+
+            const hoje = new Date();
+            let mesIdx = hoje.getMonth() + 1;
+            if (mesIdx < 1) mesIdx = 1;
+            if (mesIdx > 9) mesIdx = 9;
+            const colunaMesAtual = MESES_COLUNAS[mesIdx - 1];
+            document.getElementById("filtroMesMapa").value = colunaMesAtual;
+
+            carregarMapaParaMes(colunaMesAtual);
+
+            document.getElementById("filtroMesMapa").addEventListener("change", function () {
+                carregarMapaParaMes(this.value);
+            });
+        });
+
+        function confirmarLimpeza() {
+            if (confirm("Tem certeza que deseja apagar TODOS os dados? Esta ação não pode ser desfeita.")) {
+                fetch("/limpar_tudo", {
+                    method: "POST"
+                })
+                .then(r => r.json())
+                .then(() => {
+                    alert("Todos os dados foram apagados.");
+                    location.reload();
+                });
+            }
+        }
+
+        function onEstadoChange() {
+            const uf = document.getElementById("filtroEstado").value;
+            const selMunicipio = document.getElementById("filtroMunicipio");
+            selMunicipio.innerHTML = '<option value="">Todos</option>';
+
+            if (!uf) return;
+
+            fetch("/municipios/" + uf)
+                .then(r => r.json())
+                .then(lista => {
+                    lista.forEach(m => {
+                        const opt = document.createElement("option");
+                        opt.value = m.id + "|" + m.nome;
+                        opt.textContent = m.nome;
+                        selMunicipio.appendChild(opt);
+                    });
+                });
+        }
+
+        function aplicarFiltros() {
+
+            const filtros = {
+                estado: document.getElementById("filtroEstado").value,
+                municipio: document.getElementById("filtroMunicipio").value,
+                formador: document.getElementById("filtroFormador").value,
+                data_ini: document.getElementById("filtroDataIni").value,
+                data_fim: document.getElementById("filtroDataFim").value
+            };
+
+            fetch("/api/filtrar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(filtros)
+            })
+            .then(r => r.json())
+            .then(res => {
+                atualizarTabela(res.tabela);
+                atualizarCards(res.cards);
+                atualizarGraficos(res.estados, res.meses);
+                atualizarMapa(res.estados, res.meses);
+            });
+        }
+
+        function atualizarTabela(dados) {
+
+            tabela.clear();
+
+            dados.forEach(d => {
+                tabela.row.add([
+                    d.formador,
+                    d.municipio,
+                    d.estado,
+                    d.pba,
+                    d.eja_alf,
+                    d.eja_ai,
+                    d.data,
+                    `<a href="/exportar_municipio/${d.municipio_id}" class="btn btn-primary btn-sm">
+                        REGISTROS DO MUNICÍPIO
+                     </a>`
+                ]);
+            });
+
+            tabela.draw();
+        }
+
+        function atualizarCards(cards) {
+            document.getElementById("totalPBA").innerText = cards.pba;
+            document.getElementById("totalEJAAlf").innerText = cards.eja_alf;
+            document.getElementById("totalEJAAI").innerText = cards.eja_ai;
+            document.getElementById("totalGeral").innerText = cards.geral;
+        }
+
+        function montarDashboard(data) {
+
+            const totalPBA = data.pba.reduce((a,b)=>a+b,0);
+            const totalEJAAlf = data.eja_alf.reduce((a,b)=>a+b,0);
+            const totalEJAAI = data.eja_ai.reduce((a,b)=>a+b,0);
+            const totalGeral = totalPBA + totalEJAAlf + totalEJAAI;
+
+            document.getElementById("totalPBA").innerText = totalPBA;
+            document.getElementById("totalEJAAlf").innerText = totalEJAAlf;
+            document.getElementById("totalEJAAI").innerText = totalEJAAI;
+            document.getElementById("totalGeral").innerText = totalGeral;
+
+            graficoEstados = new Chart(document.getElementById("graficoEstados"), {
+                type: "bar",
+                data: {
+                    labels: data.estados,
+                    datasets: [{
+                        label: "Total de Turmas",
+                        data: data.meses.map(m => m.reduce((a,b)=>a+b,0)),
+                        backgroundColor: "#4e73df"
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            graficoProgramas = new Chart(document.getElementById("graficoProgramas"), {
+                type: "pie",
+                data: {
+                    labels: ["PBA", "EJA Alf.", "EJA AI"],
+                    datasets: [{
+                        data: [totalPBA, totalEJAAlf, totalEJAAI],
+                        backgroundColor: ["#1cc88a", "#36b9cc", "#f6c23e"]
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            const datasetsLinha = data.estados.map((uf, idx) => ({
+                label: uf,
+                data: data.meses[idx],
+                borderWidth: 2,
+                fill: false
+            }));
+
+            graficoLinha = new Chart(document.getElementById("graficoLinha"), {
+                type: "line",
+                data: {
+                    labels: MESES_LABELS,
+                    datasets: datasetsLinha
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function atualizarGraficos(estados, meses_por_estado) {
+
+            const labels = Object.keys(estados);
+            const totais = Object.values(estados);
+
+            graficoEstados.data.labels = labels;
+            graficoEstados.data.datasets[0].data = totais;
+            graficoEstados.update();
+
+            const totalGeral = totais.reduce((a,b)=>a+b,0);
+            graficoProgramas.data.datasets[0].data = [
+                totalGeral * 0.33,
+                totalGeral * 0.33,
+                totalGeral * 0.34
+            ];
+            graficoProgramas.update();
+
+            const datasetsLinha = Object.keys(meses_por_estado).map(uf => ({
+                label: uf,
+                data: meses_por_estado[uf],
+                borderWidth: 2,
+                fill: false
+            }));
+
+            graficoLinha.data.labels = MESES_LABELS;
+            graficoLinha.data.datasets = datasetsLinha;
+            graficoLinha.update();
+        }
+
+        function carregarMapaParaMes(coluna) {
+            fetch("/api/mapa_mes/" + coluna)
+                .then(r => r.json())
+                .then(data => {
+                    if (!mapaBrasil) {
+                        montarMapa(data);
+                    } else {
+                        const dados = data.map(e => ({
+                            'hc-key': 'br-' + e.uf.toLowerCase(),
+                            value: e.total
+                        }));
+                        mapaBrasil.series[0].setData(dados);
+                    }
+                });
+        }
+
+        function montarMapa(estados) {
+
+            const dados = estados.map(e => ({
+                'hc-key': 'br-' + e.uf.toLowerCase(),
+                value: e.total
+            }));
+
+            mapaBrasil = Highcharts.mapChart('mapaBrasil', {
+                chart: { map: 'countries/br/br-all' },
+                title: { text: '' },
+                legend: { enabled: true },
+                colorAxis: {
+                    min: 0,
+                    stops: [
+                        [0, '#d4f1f9'],
+                        [0.5, '#1ca3ec'],
+                        [1, '#005f99']
+                    ]
+                },
+                series: [{
+                    data: dados,
+                    name: 'Participantes',
+                    states: { hover: { color: '#ffcc00' }},
+                    dataLabels: { enabled: true, format: '{point.name}' },
+                    point: {
+                        events: {
+                            click: function () {
+                                const uf = this['hc-key'].split('-')[1].toUpperCase();
+                                document.getElementById("filtroEstado").value = uf;
+                                document.getElementById("filtroMunicipio").innerHTML = '<option value="">Todos</option>';
+                                onEstadoChange();
+                                aplicarFiltros();
+                            }
+                        }
+                    }
+                }]
+            });
+        }
+
+        function atualizarMapa(estados, meses_por_estado) {
+
+            const coluna = document.getElementById("filtroMesMapa").value;
+            const idx = MESES_COLUNAS.indexOf(coluna);
+
+            const dados = Object.keys(meses_por_estado).map(uf => ({
+                'hc-key': 'br-' + uf.toLowerCase(),
+                value: idx >= 0 ? (meses_por_estado[uf][idx] || 0) : 0
+            }));
+
+            if (mapaBrasil && mapaBrasil.series && mapaBrasil.series[0]) {
+                mapaBrasil.series[0].setData(dados);
+            }
+        }
+    </script>
+
+</body>
+</html>
+

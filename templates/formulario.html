@@ -1,434 +1,176 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>Formulário EJA</title>
-<link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <title>Formulário de Registro</title>
 
-<style>
-.erro {
-    border: 2px solid red !important;
-}
-</style>
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 
+    <style>
+        body {
+            background: #f5f6fa;
+        }
+
+        .card {
+            border-radius: 12px;
+        }
+
+        .campo-mes {
+            width: 90px;
+        }
+
+        @media (max-width: 768px) {
+            .campo-mes {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 
-<body>
+<body class="p-3">
 
-<div class="container">
+    <div class="container">
 
-<div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px;">
-<b>Atenção:</b> O preenchimento deste formulário substitui automaticamente qualquer envio anterior realizado por este usuário.
-<br>Para fins de monitoramento, será considerado sempre o <b>último envio realizado</b>.
-</div>
+        <h3 class="mb-4 text-center">📋 Registro de Turmas</h3>
 
-<h2>Formulário - Formador Regional</h2>
+        <!-- ================= ALERTA PARA GESTORA ================= -->
+        {% if is_gestor %}
+        <div class="alert alert-info text-center">
+            <strong>Modo Gestora:</strong> Você pode selecionar qualquer estado e município.
+        </div>
+        {% endif %}
 
-<form method="POST" action="/salvar" onsubmit="return validarFormulario()">
+        <form action="/salvar" method="POST">
 
-<label><b>Estado:</b></label><br>
+            <!-- ================= ESTADO ================= -->
+            <div class="card shadow p-3 mb-4">
+                <h5>Informações Gerais</h5>
 
-<select id="estado" name="estado" required {% if estado_fixo %}disabled{% endif %}>
-    {% if not estado_fixo %}
-        <option value="" disabled selected>ESCOLHA O SEU ESTADO</option>
-    {% endif %}
-</select>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Estado</label>
 
-{% if estado_fixo %}
-    <input type="hidden" name="estado" value="{{ estado_fixo }}">
-    <p style="color:#555;">Estado fixado: <b>{{ estado_fixo }}</b>. Alterações somente pelo gestor.</p>
-{% endif %}
+                        {% if is_gestor %}
+                            <!-- Gestora pode escolher qualquer estado -->
+                            <select id="estado" name="estado" class="form-select" required>
+                                <option value="">Selecione</option>
+                                {% for e in estados %}
+                                    <option value="{{ e.sigla }}">{{ e.sigla }} - {{ e.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
+                            <!-- Formador tem estado fixo -->
+                            <input type="text" class="form-control" value="{{ estado_fixo }}" readonly>
+                            <input type="hidden" name="estado" value="{{ estado_fixo }}">
+                        {% endif %}
+                    </div>
 
-<br><br>
-
-<label><b>Municípios (pode selecionar vários):</b></label><br>
-<select id="municipios" multiple size="8" name="municipios"></select>
-
-<br><br>
-
-<div id="blocos"></div>
-
-<br>
-<button type="submit">Salvar Informações</button>
-
-{% if is_gestor %}
-    <br><br>
-    <button type="button" onclick="abrirPainelAdmin()" 
-            style="background:#333;color:white;padding:10px 20px;border:none;border-radius:6px;">
-        Painel Admin
-    </button>
-{% endif %}
-
-</form>
-
-</div>
-
-<script>
-
-// ================= CONFIG =================
-const mesAtual = new Date().getMonth() + 1;
-
-// ================= VALIDAÇÃO =================
-function limparErros(){
-    document.querySelectorAll(".erro").forEach(e=>e.classList.remove("erro"));
-}
-
-function erroCampo(campo){
-    campo.classList.add("erro");
-}
-
-function validarFormulario(){
-
-    limparErros();
-    let valido = true;
-
-    let blocos = document.querySelectorAll("#blocos > div");
-
-    blocos.forEach(bloco => {
-
-        let selects = bloco.querySelectorAll("select");
-
-        selects.forEach(select => {
-            if (!select.value){
-                erroCampo(select);
-                valido = false;
-            }
-        });
-
-        let pares = [
-            ["pba", "pba_qtd"],
-            ["eja_alf", "eja_alf_qtd"],
-            ["eja_ai", "eja_ai_qtd"]
-        ];
-
-        pares.forEach(([campo, qtd]) => {
-
-            let sel = bloco.querySelector(`[name^="${campo}_"]`);
-            let input = bloco.querySelector(`[name^="${qtd}_"]`);
-
-            if (!sel || !input) return;
-
-            if (input.disabled) return;
-
-            let valor = input.value;
-
-            if (valor === "" || isNaN(valor) || parseInt(valor) < 0){
-                erroCampo(input);
-                valido = false;
-                return;
-            }
-
-            if (sel.value === "sim" && parseInt(valor) <= 0){
-                erroCampo(input);
-                valido = false;
-            }
-
-            if ((sel.value === "não" || sel.value === "não sei") && parseInt(valor) !== 0){
-                erroCampo(input);
-                valido = false;
-            }
-
-        });
-
-    });
-
-    let meses = document.querySelectorAll(".mes");
-
-    meses.forEach(input => {
-
-        let valor = input.value;
-
-        if (valor === "" || isNaN(valor) || parseInt(valor) < 0){
-            erroCampo(input);
-            valido = false;
-        }
-
-    });
-
-    if (!valido){
-        alert("Existem campos obrigatórios não preenchidos ou inválidos.");
-    }
-
-    return valido;
-}
-
-document.addEventListener("input", function(e){
-    if (e.target.classList.contains("erro")){
-        e.target.classList.remove("erro");
-    }
-});
-
-// ================= ESTADOS =================
-fetch("/estados")
-.then(r=>r.json())
-.then(estados=>{
-    let select = document.getElementById("estado");
-    estados.sort((a,b)=>a.nome.localeCompare(b.nome));
-    estados.forEach(e=>{
-        let opt=document.createElement("option");
-        opt.value=e.sigla;
-        opt.text=e.nome;
-        select.appendChild(opt);
-    });
-
-    {% if estado_fixo %}
-        select.value = "{{ estado_fixo }}";
-        carregarMunicipiosEstadoFixo("{{ estado_fixo }}");
-    {% endif %}
-});
-
-function carregarMunicipiosEstadoFixo(uf){
-    fetch("/municipios/"+uf)
-    .then(r=>r.json())
-    .then(muns=>{
-        let select=document.getElementById("municipios");
-        select.innerHTML="";
-        muns.forEach(m=>{
-            let opt=document.createElement("option");
-            opt.value=m.id;
-            opt.text=m.nome;
-            select.appendChild(opt);
-        });
-    });
-}
-
-// ================= MUNICÍPIOS =================
-document.getElementById("estado").addEventListener("change", function(){
-
-    const uf = this.value;
-    const nomeEstado = this.options[this.selectedIndex].text;
-
-    if (!confirm("Você confirma que o seu Estado é: " + nomeEstado + " ("+uf+") ?\n\nApós confirmar, este Estado ficará fixo para seus próximos envios.")) {
-        this.value = "";
-        return;
-    }
-
-    fetch("/municipios/"+uf)
-    .then(r=>r.json())
-    .then(muns=>{
-        let select=document.getElementById("municipios");
-        select.innerHTML="";
-        muns.forEach(m=>{
-            let opt=document.createElement("option");
-            opt.value=m.id;
-            opt.text=m.nome;
-            select.appendChild(opt);
-        });
-    });
-
-});
-
-// ================= MESES DINÂMICOS =================
-function gerarMeses(id){
-
-    const meses = [
-        ["Jan","jan"],["Fev","fev"],["Mar","mar"],["Abr","abr"],
-        ["Mai","mai"],["Jun","jun"],["Jul","jul"],["Ago","ago"],["Set","setm"]
-    ];
-
-    let html = "";
-
-    meses.forEach((m, index) => {
-
-        let numeroMes = index + 1;
-
-        if (numeroMes <= mesAtual){
-
-            html += `
-            <div style="display:inline-block;margin-right:10px;">
-            ${m[0]}:
-            <input class="mes" type="number" min="0" 
-                   name="${m[1]}_${id}" 
-                   data-mes-num="${numeroMes}"
-                   style="width:70px;">
+                    <div class="col-md-6">
+                        <label class="form-label">Município(s)</label>
+                        <select id="municipios" name="municipios" class="form-select" multiple required>
+                            <option value="">Selecione o estado primeiro</option>
+                        </select>
+                        <small class="text-muted">Você pode selecionar vários municípios.</small>
+                    </div>
+                </div>
             </div>
-            `;
-        }
 
-    });
+            <!-- ================= CAMPOS DINÂMICOS ================= -->
+            <div id="areaMunicipios"></div>
 
-    return html;
-}
+            <!-- ================= BOTÃO SALVAR ================= -->
+            <div class="text-center mt-4">
+                <button class="btn btn-primary btn-lg w-100">
+                    Salvar Registro
+                </button>
+            </div>
 
-// ================= CONTROLE QUANTIDADE =================
-function controlarQuantidade(select,id){
+        </form>
+    </div>
 
-    let campo = document.getElementById(id);
+    <!-- JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-    if (select.value === "não" || select.value === "não sei"){
-        campo.value = 0;
-        campo.disabled = false; // ainda pode ajustar para 0
-    } else {
-        campo.disabled = false;
-    }
-}
+    <script>
+        // Carregar municípios ao selecionar estado
+        document.getElementById("estado")?.addEventListener("change", function () {
+            const uf = this.value;
+            const select = document.getElementById("municipios");
 
-// ================= CARREGAR DADOS ANTERIORES =================
-function preencherDadosAnteriores(id){
+            select.innerHTML = "<option>Carregando...</option>";
 
-    fetch("/api/dados_municipio/" + id)
-    .then(r => r.json())
-    .then(d => {
-        if (!d.existe) return;
-
-        // formador local
-        let fl = document.querySelector(`[name="formador_local_${id}"]`);
-        if (fl) fl.value = d.formador_local || "";
-
-        // PBA
-        let pba = document.querySelector(`[name="pba_${id}"]`);
-        let pba_qtd = document.getElementById(`pba_qtd_${id}`);
-        if (pba) pba.value = d.pba || "";
-        if (pba_qtd) {
-            pba_qtd.value = d.pba_qtd || 0;
-            pba_qtd.disabled = false;
-        }
-
-        // EJA Alf
-        let eja_alf = document.querySelector(`[name="eja_alf_${id}"]`);
-        let eja_alf_qtd = document.getElementById(`eja_alf_qtd_${id}`);
-        if (eja_alf) eja_alf.value = d.eja_alf || "";
-        if (eja_alf_qtd) {
-            eja_alf_qtd.value = d.eja_alf_qtd || 0;
-            eja_alf_qtd.disabled = false;
-        }
-
-        // EJA AI
-        let eja_ai = document.querySelector(`[name="eja_ai_${id}"]`);
-        let eja_ai_qtd = document.getElementById(`eja_ai_qtd_${id}`);
-        if (eja_ai) eja_ai.value = d.eja_ai || "";
-        if (eja_ai_qtd) {
-            eja_ai_qtd.value = d.eja_ai_qtd || 0;
-            eja_ai_qtd.disabled = false;
-        }
-
-        // Meses
-        const mesesDados = d.meses || {};
-        const camposMes = document.querySelectorAll(`#bloco_${id} .mes`);
-
-        camposMes.forEach(input => {
-            const nome = input.name.split("_")[0]; // jan, fev, ...
-            const numMes = parseInt(input.dataset.mesNum);
-            const valorAnterior = mesesDados[nome] || 0;
-
-            if (numMes < mesAtual && valorAnterior > 0){
-                input.value = valorAnterior;
-                input.readOnly = true;
-            } else if (numMes === mesAtual){
-                input.value = valorAnterior || "";
-                input.readOnly = false;
-            } else if (numMes < mesAtual && (!valorAnterior || valorAnterior === 0)){
-                input.value = valorAnterior;
-                input.readOnly = false;
-            }
+            fetch("/municipios/" + uf)
+                .then(r => r.json())
+                .then(lista => {
+                    select.innerHTML = "";
+                    lista.forEach(m => {
+                        const opt = document.createElement("option");
+                        opt.value = m.id;
+                        opt.textContent = m.nome;
+                        select.appendChild(opt);
+                    });
+                });
         });
 
-    });
-}
+        // Criar campos dinâmicos para cada município selecionado
+        document.getElementById("municipios")?.addEventListener("change", function () {
+            const selecionados = Array.from(this.selectedOptions);
+            const area = document.getElementById("areaMunicipios");
 
-// ================= MUNICÍPIOS / BLOCOS =================
-let selecionados = new Set();
+            area.innerHTML = "";
 
-document.getElementById("municipios").addEventListener("change", function(){
+            selecionados.forEach(opt => {
+                const id = opt.value;
+                const nome = opt.textContent;
 
-    let blocos = document.getElementById("blocos");
+                area.innerHTML += `
+                    <div class="card shadow p-3 mb-4">
+                        <h5>${nome}</h5>
 
-    Array.from(this.selectedOptions).forEach(opt=>{
+                        <input type="hidden" name="nome_${id}" value="${nome}">
 
-        let id = opt.value;
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Formador Local</label>
+                                <input type="text" name="formador_local_${id}" class="form-control">
+                            </div>
 
-        if (!selecionados.has(id)){
+                            <div class="col-md-6">
+                                <label class="form-label">PBA - Quantidade</label>
+                                <input type="number" name="pba_qtd_${id}" class="form-control" min="0">
+                            </div>
+                        </div>
 
-            selecionados.add(id);
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">EJA Alfabetização - Quantidade</label>
+                                <input type="number" name="eja_alf_qtd_${id}" class="form-control" min="0">
+                            </div>
 
-            let nome = opt.text;
+                            <div class="col-md-6">
+                                <label class="form-label">EJA Anos Iniciais - Quantidade</label>
+                                <input type="number" name="eja_ai_qtd_${id}" class="form-control" min="0">
+                            </div>
+                        </div>
 
-            let div = document.createElement("div");
-            div.id = "bloco_"+id;
+                        <hr>
 
-            div.innerHTML = `
-            <h3>${nome}</h3>
+                        <h6>Participantes por mês</h6>
 
-            <button type="button" onclick="removerMunicipio('${id}')">RETIRAR MUNICÍPIO</button><br><br>
-
-            <input type="hidden" name="municipios" value="${id}">
-            <input type="hidden" name="nome_${id}" value="${nome}">
-
-            Há Formador Local?
-            <select name="formador_local_${id}">
-            <option value="">Selecione</option>
-            <option value="sim">Sim</option>
-            <option value="não">Não</option>
-            <option value="não identificado">Não identificado</option>
-            </select><br><br>
-
-            Há turma de PBA?
-            <select name="pba_${id}" onchange="controlarQuantidade(this,'pba_qtd_${id}')">
-            <option value="">Selecione</option>
-            <option value="sim">Sim</option>
-            <option value="não">Não</option>
-            <option value="não sei">Não sei</option>
-            </select>
-            Se sim, quantas? <input id="pba_qtd_${id}" type="number" min="0" name="pba_qtd_${id}"><br><br>
-
-            Há turma de Alfabetização da EJA?
-            <select name="eja_alf_${id}" onchange="controlarQuantidade(this,'eja_alf_qtd_${id}')">
-            <option value="">Selecione</option>
-            <option value="sim">Sim</option>
-            <option value="não">Não</option>
-            <option value="não sei">Não sei</option>
-            </select>
-            Se sim, quantas turmas? <input id="eja_alf_qtd_${id}" type="number" min="0" name="eja_alf_qtd_${id}"><br><br>
-
-            Há turma de EJA (Anos Iniciais do Ensino Fundamental):
-            <select name="eja_ai_${id}" onchange="controlarQuantidade(this,'eja_ai_qtd_${id}')">
-            <option value="">Selecione</option>
-            <option value="sim">Sim</option>
-            <option value="não">Não</option>
-            <option value="não sei">Não sei</option>
-            </select>
-            Se sim, quantas turmas? <input id="eja_ai_qtd_${id}" type="number" min="0" name="eja_ai_qtd_${id}"><br><br>
-
-            <b>Formação presencial (Quantidade de participantes por mês | PBA + Escolas)</b><br><br>
-
-            ${gerarMeses(id)}
-
-            <hr>
-            `;
-
-            blocos.appendChild(div);
-
-            // carregar dados anteriores, se existirem
-            preencherDadosAnteriores(id);
-        }
-
-    });
-
-});
-
-// ================= REMOVER =================
-function removerMunicipio(id){
-    document.getElementById("bloco_"+id)?.remove();
-    selecionados.delete(id);
-
-    let select = document.getElementById("municipios");
-    Array.from(select.options).forEach(o=>{
-        if (o.value==id) o.selected=false;
-    });
-}
-
-// ================= PAINEL ADMIN =================
-function abrirPainelAdmin(){
-    let senha = prompt("Digite a senha de acesso ao Painel Admin:");
-
-    if (senha === "PactoBrasilPelaEJA"){
-        window.location.href = "/dashboard";
-    } else if (senha !== null){
-        alert("Senha incorreta.");
-    }
-}
-
-</script>
+                        <div class="row mt-2">
+                            ${["jan","fev","mar","abr","mai","jun","jul","ago","setm"].map(m => `
+                                <div class="col-4 col-md-2 mb-2">
+                                    <label class="form-label text-capitalize">${m}</label>
+                                    <input type="number" name="${m}_${id}" class="form-control campo-mes" min="0">
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                `;
+            });
+        });
+    </script>
 
 </body>
 </html>
