@@ -40,6 +40,34 @@ def permitir_login_temporario():
     # 4. Se não está logada e não é rota pública → manda para /
     return redirect("/")
 
+
+@app.before_request
+def permitir_login_temporario():
+    # 1. Permitir login via URL para testes
+    nome = request.args.get("nome")
+    email = request.args.get("email")
+
+    if nome and email:
+        session["nome"] = nome
+        session["email"] = email
+        return
+
+    # 2. Se já está logada, segue normalmente
+    if "email" in session:
+        return
+
+    # 3. Permitir acesso às rotas públicas
+    rotas_livres = [
+        "/", "/login", "/lti/init", "/lti/login", "/lti/jwks",
+        "/static", "/favicon.ico"
+    ]
+
+    if any(request.path.startswith(r) for r in rotas_livres):
+        return
+
+    # 4. Se não está logada e não é rota pública → manda para /
+    return redirect("/")
+
 @app.before_request
 def garantir_login():
     # Permitir acesso às rotas públicas
