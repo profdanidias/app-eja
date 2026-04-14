@@ -18,8 +18,8 @@ app.secret_key = "SUA_SECRET_KEY_AQUI"
 #========== LOGIN SEM MOODLE =============
 @app.before_request
 def controle_de_acesso():
-    # Permitir acesso ao login (GET ou POST), mesmo com parâmetros
-    if request.endpoint == "index":
+    # Permitir acesso ao login (GET e POST)
+    if request.path == "/" and request.method in ("GET", "POST"):
         return
 
     # Permitir arquivos estáticos
