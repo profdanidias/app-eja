@@ -34,8 +34,6 @@ def controle_de_acesso():
     return redirect("/")
 
 
-
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -51,10 +49,10 @@ def index():
 
 def conectar():
     return psycopg2.connect(
-        host="SEU_HOST",
-        dbname="SEU_DB",
-        user="SEU_USER",
-        password="SUA_SENHA",
+        host="dpg-cp12345abcd12345.oregon-postgres.render.com",
+        database="eja_db",
+        user="eja_user",
+        password="9x8y7z123456",
         port=5432
     )
 
