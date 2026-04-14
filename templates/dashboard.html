@@ -214,23 +214,19 @@
 
             tabela = $('#tabela').DataTable();
 
-            // dados iniciais dos gráficos
             fetch("/api/dashboard_data")
                 .then(r => r.json())
                 .then(data => montarDashboard(data));
 
-            // configura mês atual no seletor do mapa
             const hoje = new Date();
-            let mesIdx = hoje.getMonth() + 1; // 1–12
+            let mesIdx = hoje.getMonth() + 1;
             if (mesIdx < 1) mesIdx = 1;
-            if (mesIdx > 9) mesIdx = 9; // até setembro
+            if (mesIdx > 9) mesIdx = 9;
             const colunaMesAtual = MESES_COLUNAS[mesIdx - 1];
             document.getElementById("filtroMesMapa").value = colunaMesAtual;
 
-            // carrega mapa para o mês atual
             carregarMapaParaMes(colunaMesAtual);
 
-            // quando mudar o mês do mapa
             document.getElementById("filtroMesMapa").addEventListener("change", function () {
                 carregarMapaParaMes(this.value);
             });
@@ -241,9 +237,7 @@
             const selMunicipio = document.getElementById("filtroMunicipio");
             selMunicipio.innerHTML = '<option value="">Todos</option>';
 
-            if (!uf) {
-                return;
-            }
+            if (!uf) return;
 
             fetch("/municipios/" + uf)
                 .then(r => r.json())
@@ -399,7 +393,17 @@
         function carregarMapaParaMes(coluna) {
             fetch("/api/mapa_mes/" + coluna)
                 .then(r => r.json())
-                .then(data => montarMapa(data));
+                .then(data => {
+                    if (!mapaBrasil) {
+                        montarMapa(data);
+                    } else {
+                        const dados = data.map(e => ({
+                            'hc-key': 'br-' + e.uf.toLowerCase(),
+                            value: e.total
+                        }));
+                        mapaBrasil.series[0].setData(dados);
+                    }
+                });
         }
 
         function montarMapa(estados) {

@@ -108,13 +108,11 @@ def salvar():
     usuario = session.get("nome")
     estado = request.form.get("estado")
 
-    # AGORA FUNCIONA: recebe TODOS os municípios via hidden inputs
     municipios = request.form.getlist("municipios")
 
     data_envio = datetime.now().strftime("%d/%m/%Y %H:%M")
 
     for m in municipios:
-
         cur.execute("""
         INSERT INTO respostas (
             usuario_id, municipio_id, municipio_nome, estado,
@@ -165,7 +163,6 @@ def dashboard():
     conn = conectar()
     cur = conn.cursor()
 
-    # AGORA SEMPRE MOSTRA OS MAIS RECENTES NO TOPO
     cur.execute("""
         SELECT 
             usuario_id, municipio_nome, estado, formador_local,
@@ -259,16 +256,56 @@ def dashboard_data():
     })
 
 
-# ================= API MAPA BRASIL (INICIAL) =================
+# ================= MAPA BRASIL POR MÊS =================
+MESES_COLUNAS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "setm"]
+
+
+def coluna_mes_atual():
+    mes_idx = datetime.now().month
+    if mes_idx < 1:
+        mes_idx = 1
+    if mes_idx > 9:
+        mes_idx = 9
+    return MESES_COLUNAS[mes_idx - 1]
+
+
 @app.route("/api/mapa")
 def api_mapa():
+    coluna = coluna_mes_atual()
+    return _dados_mapa_por_coluna(coluna)
+
+
+@app.route("/api/mapa_mes/<coluna>")
+def api_mapa_mes(coluna):
+    MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "setm"]
+
+    if coluna not in MESES:
+        return jsonify([])
 
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(f"""
+        SELECT estado, SUM(COALESCE({coluna}, 0))
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    dados = [{"uf": r[0], "total": r[1] or 0} for r in rows]
+
+    return jsonify(dados)
+
+
+def _dados_mapa_por_coluna(coluna):
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(f"""
         SELECT estado,
-               SUM(pba_qtd + eja_alfabetizacao_qtd + eja_anos_iniciais_qtd)
+               SUM(COALESCE({coluna}, 0))
         FROM respostas
         GROUP BY estado
     """)
@@ -329,7 +366,6 @@ def filtrar():
         query += " AND date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) <= date(?)"
         params.append(data_fim)
 
-    # ORDENAR SEMPRE DO MAIS NOVO PARA O MAIS ANTIGO
     query += """
         ORDER BY 
             date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
