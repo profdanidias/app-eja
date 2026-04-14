@@ -2,10 +2,10 @@ import requests
 import psycopg2
 
 # CONFIGURAÇÃO DO BANCO
-DB_HOST = "SEU_HOST"
-DB_NAME = "SEU_DB"
-DB_USER = "SEU_USER"
-DB_PASS = "SUA_SENHA"
+DB_HOST = "dpg-d7f5m8rbc2fs738hmrs0-a"
+DB_NAME = "postgresql_eja"
+DB_USER = "postgresql_eja_user"
+DB_PASS = "ieeth18XxaNhJOLVmas0VALthQR42Pyr"
 DB_PORT = 5432
 
 def conectar():
