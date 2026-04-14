@@ -18,8 +18,12 @@ app.secret_key = "SUA_SECRET_KEY_AQUI"
 #========== LOGIN SEM MOODLE =============
 @app.before_request
 def controle_de_acesso():
-    # Permitir acesso à página de login e arquivos estáticos
-    if request.path == "/" or request.path.startswith("/static"):
+    # Permitir acesso ao login (GET ou POST), mesmo com parâmetros
+    if request.endpoint == "index":
+        return
+
+    # Permitir arquivos estáticos
+    if request.path.startswith("/static"):
         return
 
     # Se já está logado, segue
@@ -28,6 +32,8 @@ def controle_de_acesso():
 
     # Caso contrário, volta para o login
     return redirect("/")
+
+
 
 
 @app.route("/", methods=["GET", "POST"])
