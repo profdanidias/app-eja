@@ -2,175 +2,166 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Formulário de Registro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário EJA</title>
 
     <!-- Bootstrap -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- jQuery (necessário para Select2) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <style>
-        body {
-            background: #f5f6fa;
-        }
-
-        .card {
-            border-radius: 12px;
-        }
-
-        .campo-mes {
-            width: 90px;
-        }
-
-        @media (max-width: 768px) {
-            .campo-mes {
-                width: 100%;
-            }
+        .select2-container .select2-selection--multiple {
+            min-height: 38px;
+            padding: 4px;
         }
     </style>
 </head>
 
-<body class="p-3">
+<body class="bg-light">
 
-    <div class="container">
+<div class="container mt-4 mb-5">
+    <h2 class="mb-4">Formulário de Acompanhamento</h2>
 
-        <h3 class="mb-4 text-center">📋 Registro de Turmas</h3>
+    <form action="/salvar" method="POST">
 
-        <!-- ================= ALERTA PARA GESTORA ================= -->
-        {% if is_gestor %}
-        <div class="alert alert-info text-center">
-            <strong>Modo Gestora:</strong> Você pode selecionar qualquer estado e município.
-        </div>
-        {% endif %}
+        <!-- ================= ESTADO ================= -->
+        <div class="card shadow p-3 mb-4">
+            <h5>Informações Gerais</h5>
 
-        <form action="/salvar" method="POST">
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label">Estado</label>
 
-            <!-- ================= ESTADO ================= -->
-            <div class="card shadow p-3 mb-4">
-                <h5>Informações Gerais</h5>
-
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Estado</label>
-
-                        {% if is_gestor %}
-                            <!-- Gestora pode escolher qualquer estado -->
-                            <select id="estado" name="estado" class="form-select" required>
-                                <option value="">Selecione</option>
-                                {% for e in estados %}
-                                    <option value="{{ e.sigla }}">{{ e.sigla }} - {{ e.nome }}</option>
-                                {% endfor %}
-                            </select>
-                        {% else %}
-                            <!-- Formador tem estado fixo -->
-                            <input type="text" class="form-control" value="{{ estado_fixo }}" readonly>
-                            <input type="hidden" name="estado" value="{{ estado_fixo }}">
-                        {% endif %}
-                    </div>
-
-                    <div class="col-md-6">
-                        <label class="form-label">Município(s)</label>
-                        <select id="municipios" name="municipios" class="form-select" multiple required>
-                            <option value="">Selecione o estado primeiro</option>
+                    {% if is_gestor %}
+                        <select id="estado" name="estado" class="form-select" required>
+                            <option value="">Selecione</option>
+                            {% for e in estados %}
+                                <option value="{{ e.sigla }}">{{ e.sigla }} - {{ e.nome }}</option>
+                            {% endfor %}
                         </select>
-                        <small class="text-muted">Você pode selecionar vários municípios.</small>
-                    </div>
+                    {% else %}
+                        <input type="text" class="form-control" value="{{ estado_fixo }}" readonly>
+                        <input type="hidden" name="estado" value="{{ estado_fixo }}">
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Município(s)</label>
+
+                    <select id="municipios" name="municipios" class="form-select" multiple required>
+                        <option value="">Selecione o estado primeiro</option>
+                    </select>
+
+                    <small class="text-muted">Você pode selecionar vários municípios.</small>
                 </div>
             </div>
+        </div>
 
-            <!-- ================= CAMPOS DINÂMICOS ================= -->
-            <div id="areaMunicipios"></div>
+        <!-- ÁREA DINÂMICA DOS MUNICÍPIOS -->
+        <div id="areaMunicipios"></div>
 
-            <!-- ================= BOTÃO SALVAR ================= -->
-            <div class="text-center mt-4">
-                <button class="btn btn-primary btn-lg w-100">
-                    Salvar Registro
-                </button>
-            </div>
+        <button class="btn btn-primary mt-3">Enviar</button>
+    </form>
+</div>
 
-        </form>
-    </div>
-
-    <!-- JS -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-    <script>
-        // Carregar municípios ao selecionar estado
-        document.getElementById("estado")?.addEventListener("change", function () {
-            const uf = this.value;
-            const select = document.getElementById("municipios");
-
-            select.innerHTML = "<option>Carregando...</option>";
-
-            fetch("/municipios/" + uf)
-                .then(r => r.json())
-                .then(lista => {
-                    select.innerHTML = "";
-                    lista.forEach(m => {
-                        const opt = document.createElement("option");
-                        opt.value = m.id;
-                        opt.textContent = m.nome;
-                        select.appendChild(opt);
-                    });
-                });
+<!-- ================= JAVASCRIPT ================= -->
+<script>
+    // Ativar Select2 no campo de municípios
+    $(document).ready(function() {
+        $('#municipios').select2({
+            placeholder: "Selecione os municípios",
+            width: '100%'
         });
+    });
 
-        // Criar campos dinâmicos para cada município selecionado
-        document.getElementById("municipios")?.addEventListener("change", function () {
-            const selecionados = Array.from(this.selectedOptions);
-            const area = document.getElementById("areaMunicipios");
+    // Carregar municípios ao selecionar estado
+    document.getElementById("estado")?.addEventListener("change", function () {
+        const uf = this.value;
+        const select = document.getElementById("municipios");
 
-            area.innerHTML = "";
+        // Mensagem temporária
+        select.innerHTML = "<option>Carregando...</option>";
+        $('#municipios').trigger('change');
 
-            selecionados.forEach(opt => {
-                const id = opt.value;
-                const nome = opt.textContent;
+        fetch("/municipios/" + uf)
+            .then(r => r.json())
+            .then(lista => {
+                select.innerHTML = "";
 
-                area.innerHTML += `
-                    <div class="card shadow p-3 mb-4">
-                        <h5>${nome}</h5>
+                lista.forEach(m => {
+                    const opt = new Option(m.nome, m.id, false, false);
+                    select.add(opt);
+                });
 
-                        <input type="hidden" name="nome_${id}" value="${nome}">
+                // Atualiza Select2
+                $('#municipios').trigger('change');
+            });
+    });
 
-                        <div class="row mt-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Formador Local</label>
-                                <input type="text" name="formador_local_${id}" class="form-control">
-                            </div>
+    // Criar campos dinâmicos para cada município selecionado
+    document.getElementById("municipios")?.addEventListener("change", function () {
+        const selecionados = Array.from(this.selectedOptions);
+        const area = document.getElementById("areaMunicipios");
 
-                            <div class="col-md-6">
-                                <label class="form-label">PBA - Quantidade</label>
-                                <input type="number" name="pba_qtd_${id}" class="form-control" min="0">
-                            </div>
+        area.innerHTML = "";
+
+        selecionados.forEach(opt => {
+            const id = opt.value;
+            const nome = opt.textContent;
+
+            area.innerHTML += `
+                <div class="card shadow p-3 mb-4">
+                    <h5>${nome}</h5>
+
+                    <input type="hidden" name="nome_${id}" value="${nome}">
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Formador Local</label>
+                            <input type="text" name="formador_local_${id}" class="form-control">
                         </div>
 
-                        <div class="row mt-3">
-                            <div class="col-md-6">
-                                <label class="form-label">EJA Alfabetização - Quantidade</label>
-                                <input type="number" name="eja_alf_qtd_${id}" class="form-control" min="0">
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label">EJA Anos Iniciais - Quantidade</label>
-                                <input type="number" name="eja_ai_qtd_${id}" class="form-control" min="0">
-                            </div>
-                        </div>
-
-                        <hr>
-
-                        <h6>Participantes por mês</h6>
-
-                        <div class="row mt-2">
-                            ${["jan","fev","mar","abr","mai","jun","jul","ago","setm"].map(m => `
-                                <div class="col-4 col-md-2 mb-2">
-                                    <label class="form-label text-capitalize">${m}</label>
-                                    <input type="number" name="${m}_${id}" class="form-control campo-mes" min="0">
-                                </div>
-                            `).join("")}
+                        <div class="col-md-6">
+                            <label class="form-label">PBA - Quantidade</label>
+                            <input type="number" name="pba_qtd_${id}" class="form-control" min="0">
                         </div>
                     </div>
-                `;
-            });
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">EJA Alfabetização - Quantidade</label>
+                            <input type="number" name="eja_alf_qtd_${id}" class="form-control" min="0">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">EJA Anos Iniciais - Quantidade</label>
+                            <input type="number" name="eja_ai_qtd_${id}" class="form-control" min="0">
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6>Participantes por mês</h6>
+
+                    <div class="row mt-2">
+                        ${["jan","fev","mar","abr","mai","jun","jul","ago","setm"].map(m => `
+                            <div class="col-4 col-md-2 mb-2">
+                                <label class="form-label text-capitalize">${m}</label>
+                                <input type="number" name="${m}_${id}" class="form-control campo-mes" min="0">
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
         });
-    </script>
+    });
+</script>
 
 </body>
 </html>
