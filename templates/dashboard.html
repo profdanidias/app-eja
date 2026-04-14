@@ -13,6 +13,10 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Highcharts Maps -->
+    <script src="https://code.highcharts.com/maps/highmaps.js"></script>
+    <script src="https://code.highcharts.com/mapdata/countries/br/br-all.js"></script>
+
     <style>
         body { background: #f5f6fa; }
         .card { border-radius: 12px; }
@@ -22,7 +26,52 @@
 
 <body class="p-4">
 
-    <h2 class="mb-4">📊 Dashboard de Monitoramento</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📊 Dashboard de Monitoramento</h2>
+        <div>
+            <a href="/exportar_excel" class="btn btn-success btn-sm me-2">Exportar Excel</a>
+            <a href="/exportar_pdf" class="btn btn-danger btn-sm">Exportar PDF</a>
+        </div>
+    </div>
+
+    <!-- ================= FILTROS ================= -->
+    <div class="card shadow p-3 mb-4">
+        <h5>Filtros</h5>
+
+        <div class="row">
+            <div class="col-md-3">
+                <label>Estado</label>
+                <select id="filtroEstado" class="form-select">
+                    <option value="">Todos</option>
+                    {% for d in dados|unique(attribute='estado') %}
+                        <option value="{{ d.estado }}">{{ d.estado }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label>Formador</label>
+                <select id="filtroFormador" class="form-select">
+                    <option value="">Todos</option>
+                    {% for d in dados|unique(attribute='formador') %}
+                        <option value="{{ d.formador }}">{{ d.formador }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label>Data Inicial</label>
+                <input type="date" id="filtroDataIni" class="form-control">
+            </div>
+
+            <div class="col-md-3">
+                <label>Data Final</label>
+                <input type="date" id="filtroDataFim" class="form-control">
+            </div>
+        </div>
+
+        <button class="btn btn-primary mt-3" onclick="aplicarFiltros()">Aplicar Filtros</button>
+    </div>
 
     <!-- ================= CARDS ================= -->
     <div class="row mb-4">
@@ -76,6 +125,12 @@
         </div>
     </div>
 
+    <!-- ================= MAPA BRASIL ================= -->
+    <div class="card shadow p-3 mb-4">
+        <h5>Mapa do Brasil – Participantes por Estado</h5>
+        <div id="mapaBrasil" style="height: 500px;"></div>
+    </div>
+
     <!-- ================= TABELA ================= -->
     <div class="card shadow p-3 mt-4">
         <h5>Registros Detalhados</h5>
@@ -101,7 +156,7 @@
                     <td>{{ d.pba }}</td>
                     <td>{{ d.eja_alf }}</td>
                     <td>{{ d.eja_ai }}</td>
-                    <td>{{ d.meses | sum }}</td>
+                    <td>{{ d.total }}</td>
                     <td>{{ d.data }}</td>
                 </tr>
                 {% endfor %}
@@ -115,17 +170,93 @@
     <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
-        $(document).ready(function () {
-            $('#tabela').DataTable();
+        let tabela;
+        let graficoEstados;
+        let graficoProgramas;
+        let mapaBrasil;
 
+        $(document).ready(function () {
+
+            tabela = $('#tabela').DataTable();
+
+            // Carregar dados iniciais
             fetch("/api/dashboard_data")
                 .then(r => r.json())
                 .then(data => montarDashboard(data));
+
+            fetch("/api/mapa")
+                .then(r => r.json())
+                .then(data => montarMapa(data));
         });
 
+
+        // ============================
+        // APLICAR FILTROS
+        // ============================
+        function aplicarFiltros() {
+
+            const filtros = {
+                estado: document.getElementById("filtroEstado").value,
+                formador: document.getElementById("filtroFormador").value,
+                data_ini: document.getElementById("filtroDataIni").value,
+                data_fim: document.getElementById("filtroDataFim").value
+            };
+
+            fetch("/api/filtrar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(filtros)
+            })
+            .then(r => r.json())
+            .then(res => {
+                atualizarTabela(res.tabela);
+                atualizarCards(res.cards);
+                atualizarGraficos(res.estados);
+                atualizarMapa(res.estados);
+            });
+        }
+
+
+        // ============================
+        // ATUALIZAR TABELA
+        // ============================
+        function atualizarTabela(dados) {
+
+            tabela.clear();
+
+            dados.forEach(d => {
+                tabela.row.add([
+                    d.formador,
+                    d.municipio,
+                    d.estado,
+                    d.pba,
+                    d.eja_alf,
+                    d.eja_ai,
+                    d.total,
+                    d.data
+                ]);
+            });
+
+            tabela.draw();
+        }
+
+
+        // ============================
+        // ATUALIZAR CARDS
+        // ============================
+        function atualizarCards(cards) {
+            document.getElementById("totalPBA").innerText = cards.pba;
+            document.getElementById("totalEJAAlf").innerText = cards.eja_alf;
+            document.getElementById("totalEJAAI").innerText = cards.eja_ai;
+            document.getElementById("totalGeral").innerText = cards.geral;
+        }
+
+
+        // ============================
+        // GRÁFICOS INICIAIS
+        // ============================
         function montarDashboard(data) {
 
-            // ======== CARDS ========
             const totalPBA = data.pba.reduce((a,b)=>a+b,0);
             const totalEJAAlf = data.eja_alf.reduce((a,b)=>a+b,0);
             const totalEJAAI = data.eja_ai.reduce((a,b)=>a+b,0);
@@ -136,8 +267,8 @@
             document.getElementById("totalEJAAI").innerText = totalEJAAI;
             document.getElementById("totalGeral").innerText = totalGeral;
 
-            // ======== GRÁFICO ESTADOS ========
-            new Chart(document.getElementById("graficoEstados"), {
+            // Gráfico de barras
+            graficoEstados = new Chart(document.getElementById("graficoEstados"), {
                 type: "bar",
                 data: {
                     labels: data.estados,
@@ -146,11 +277,15 @@
                         data: data.pba.map((v,i)=>v + data.eja_alf[i] + data.eja_ai[i]),
                         backgroundColor: "#4e73df"
                     }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } }
                 }
             });
 
-            // ======== GRÁFICO PROGRAMAS ========
-            new Chart(document.getElementById("graficoProgramas"), {
+            // Gráfico de pizza
+            graficoProgramas = new Chart(document.getElementById("graficoProgramas"), {
                 type: "pie",
                 data: {
                     labels: ["PBA", "EJA Alf.", "EJA AI"],
@@ -158,10 +293,82 @@
                         data: [totalPBA, totalEJAAlf, totalEJAAI],
                         backgroundColor: ["#1cc88a", "#36b9cc", "#f6c23e"]
                     }]
-                }
+                },
+                options: { responsive: true }
             });
         }
+
+
+        // ============================
+        // ATUALIZAR GRÁFICOS COM FILTROS
+        // ============================
+        function atualizarGraficos(estados) {
+
+            const labels = Object.keys(estados);
+            const valores = Object.values(estados);
+
+            // Atualizar gráfico de barras
+            graficoEstados.data.labels = labels;
+            graficoEstados.data.datasets[0].data = valores;
+            graficoEstados.update();
+
+            // Atualizar gráfico de pizza
+            const totalPBA = valores.reduce((a,b)=>a+b,0);
+            graficoProgramas.data.datasets[0].data = [
+                totalPBA * 0.33,
+                totalPBA * 0.33,
+                totalPBA * 0.34
+            ];
+            graficoProgramas.update();
+        }
+
+
+        // ============================
+        // MAPA INICIAL
+        // ============================
+        function montarMapa(estados) {
+
+            const dados = estados.map(e => ({
+                'hc-key': 'br-' + e.uf.toLowerCase(),
+                value: e.total
+            }));
+
+            mapaBrasil = Highcharts.mapChart('mapaBrasil', {
+                chart: { map: 'countries/br/br-all' },
+                title: { text: '' },
+                legend: { enabled: true },
+                colorAxis: {
+                    min: 0,
+                    stops: [
+                        [0, '#d4f1f9'],
+                        [0.5, '#1ca3ec'],
+                        [1, '#005f99']
+                    ]
+                },
+                series: [{
+                    data: dados,
+                    name: 'Participantes',
+                    states: { hover: { color: '#ffcc00' }},
+                    dataLabels: { enabled: true, format: '{point.name}' }
+                }]
+            });
+        }
+
+
+        // ============================
+        // ATUALIZAR MAPA COM FILTROS
+        // ============================
+        function atualizarMapa(estados) {
+
+            const dados = Object.keys(estados).map(uf => ({
+                'hc-key': 'br-' + uf.toLowerCase(),
+                value: estados[uf]
+            }));
+
+            mapaBrasil.series[0].setData(dados);
+        }
+
     </script>
 
 </body>
-</html>
+</html>               
