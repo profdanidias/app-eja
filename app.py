@@ -107,10 +107,16 @@ def salvar():
 
     usuario = session.get("nome")
     estado = request.form.get("estado")
-    municipios = request.form.getlist("municipios")
+    # garante que pega todos os municípios, independente se o name é "municipios" ou "municipios[]"
+    municipios = request.form.getlist("municipios") or request.form.getlist("municipios[]")
     data_envio = datetime.now().strftime("%d/%m/%Y %H:%M")
 
+    # se por algum motivo vier só um valor simples, transforma em lista
+    if isinstance(municipios, str):
+        municipios = [municipios]
+
     for m in municipios:
+        # m deve ser o ID do município (IBGE) usado no formulário
         cur.execute("""
         INSERT INTO respostas (
             usuario_id, municipio_id, municipio_nome, estado,
@@ -286,7 +292,6 @@ def filtrar():
 
     municipio_id = None
     if municipio_raw:
-        # formato "ID|Nome"
         partes = municipio_raw.split("|", 1)
         municipio_id = partes[0]
 
