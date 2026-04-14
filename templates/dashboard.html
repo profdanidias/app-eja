@@ -5,18 +5,12 @@
 <title>Dashboard EJA - Completo</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4"></script>
 
 <style>
 body { font-family: Arial; background:#f4f6f9; margin:20px; }
-
-.card {
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    margin-bottom:20px;
-}
+.card { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
 
 .grid {
     display:grid;
@@ -24,16 +18,8 @@ body { font-family: Arial; background:#f4f6f9; margin:20px; }
     gap:10px;
 }
 
-select, input {
-    padding:6px;
-    width:100%;
-}
-
-button {
-    padding:8px 12px;
-    margin-top:10px;
-    cursor:pointer;
-}
+select, input { padding:6px; width:100%; }
+button { padding:8px 12px; margin-top:10px; cursor:pointer; }
 </style>
 </head>
 
@@ -41,24 +27,15 @@ button {
 
 <h2>📊 Dashboard Nacional EJA</h2>
 
-<!-- ================= FILTROS ================= -->
 <div class="card">
 
-<h3>Filtros avançados</h3>
+<h3>Filtros</h3>
 
 <div class="grid">
 
-<select id="estado">
-<option value="">Estado</option>
-</select>
-
-<select id="municipio">
-<option value="">Município</option>
-</select>
-
-<select id="formador">
-<option value="">Formador</option>
-</select>
+<select id="estado"><option value="">Estado</option></select>
+<select id="municipio"><option value="">Município</option></select>
+<select id="formador"><option value="">Formador</option></select>
 
 <select id="formadorLocal">
 <option value="">Formador Local</option>
@@ -82,37 +59,30 @@ button {
 
 </div>
 
-
-<!-- ================= MAPA ================= -->
 <div class="card">
 <h3>🗺️ Mapa do Brasil</h3>
 <canvas id="mapa"></canvas>
 <p id="estadoSelecionado"></p>
 </div>
 
-
-<!-- ================= TABELA ================= -->
 <div class="card">
 <h3>📋 Municípios</h3>
 <table border="1" width="100%" id="tabela"></table>
 </div>
 
-
 <script>
 
 const dados = {{ dados | tojson }};
-let dadosBase = [...dados];
 let dadosFiltrados = [...dados];
 
-let geoGlobal;
+let geoData;
 let chart;
 
 
-// ================= PREENCHER FILTROS =================
+// ================= FILTROS =================
 function preencher(id, campo){
-    let set = new Set(dadosBase.map(d => d[campo]));
+    let set = new Set(dados.map(d=>d[campo]));
     let el = document.getElementById(id);
-
     set.forEach(v=>{
         if(v) el.innerHTML += `<option value="${v}">${v}</option>`;
     });
@@ -125,7 +95,6 @@ preencher("formador","formador");
 
 // ================= TABELA =================
 function render(lista){
-
     let t = document.getElementById("tabela");
 
     if(lista.length === 0){
@@ -139,9 +108,6 @@ function render(lista){
         <th>Estado</th>
         <th>Formador</th>
         <th>Data</th>
-        <th>PBA</th>
-        <th>EJA Alf</th>
-        <th>EJA AI</th>
         <th>Total</th>
     </tr>`;
 
@@ -152,22 +118,18 @@ function render(lista){
             <td>${d.estado}</td>
             <td>${d.formador}</td>
             <td>${d.data}</td>
-            <td>${d.pba}</td>
-            <td>${d.eja_alf}</td>
-            <td>${d.eja_ai}</td>
             <td>${d.total}</td>
         </tr>`;
     });
 }
 
-render(dadosBase);
+render(dados);
 
 
-// ================= FILTROS =================
+// ================= FILTRO =================
 function filtrar(){
 
-    dadosFiltrados = dadosBase.filter(d => {
-
+    dadosFiltrados = dados.filter(d=>{
         return (!estado.value || d.estado === estado.value)
         && (!municipio.value || d.municipio === municipio.value)
         && (!formador.value || d.formador === formador.value)
@@ -191,30 +153,26 @@ function limpar(){
 async function carregarMapa(){
 
     const res = await fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson");
-    geoGlobal = await res.json();
+    geoData = await res.json();
 
     atualizarMapa();
 }
 
 function calcularTotais(){
-
     let mapa = {};
-
     dadosFiltrados.forEach(d=>{
         mapa[d.estado] = (mapa[d.estado] || 0) + d.total;
     });
-
     return mapa;
 }
 
-
 function atualizarMapa(){
 
-    if(!geoGlobal) return;
+    if(!geoData) return;
 
     let totais = calcularTotais();
 
-    const features = geoGlobal.features.map(f=>{
+    const features = geoData.features.map(f=>{
         let nome = f.properties.name;
 
         return {
@@ -228,7 +186,7 @@ function atualizarMapa(){
     chart = new Chart(document.getElementById("mapa"), {
         type: "choropleth",
         data: {
-            labels: geoGlobal.features.map(f=>f.properties.name),
+            labels: geoData.features.map(f=>f.properties.name),
             datasets: [{
                 label: "Participantes",
                 data: features
@@ -240,24 +198,21 @@ function atualizarMapa(){
                     callbacks: {
                         label: ctx => {
                             let nome = ctx.raw.feature.properties.name;
-                            let valor = ctx.raw.value || 0;
-
-                            return `${nome} - ${valor || "Dados não enviados"}`;
+                            let valor = ctx.raw.value;
+                            return `${nome}: ${valor || "Dados não enviados"}`;
                         }
                     }
                 }
             },
-            onClick: (evt, elements, chart) => {
+            onClick: (evt, elements) => {
 
                 if(elements.length){
-
-                    let estado = chart.data.labels[elements[0].index];
+                    let estadoSel = geoData.features[elements[0].index].properties.name;
 
                     document.getElementById("estadoSelecionado").innerText =
-                        "Estado selecionado: " + estado;
+                        "Estado selecionado: " + estadoSel;
 
-                    // mantém outros filtros + aplica estado
-                    estado.value = estado;
+                    document.getElementById("estado").value = estadoSel;
 
                     filtrar();
                 }
