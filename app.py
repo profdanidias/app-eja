@@ -13,6 +13,27 @@ from reportlab.lib.pagesizes import letter
 app = Flask(__name__)
 app.secret_key = "SUA_SECRET_KEY_AQUI"
 
+
+@app.before_request
+def garantir_login():
+    # Permitir acesso às rotas públicas
+    rotas_livres = {"/", "/login", "/static", "/favicon.ico"}
+    if request.path.startswith("/static"):
+        return
+
+    # Se já está logado, segue
+    if "email" in session:
+        return
+
+    # Se o Moodle enviou dados via POST
+    if request.method == "POST" and "email" in request.form:
+        session["email"] = request.form.get("email")
+        session["nome"] = request.form.get("nome")
+        return
+
+    # Caso contrário, manda para o login
+    return redirect("/")
+
 # ================= CONFIGURAÇÃO DO POSTGRES =================
 
 def conectar():
