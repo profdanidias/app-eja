@@ -84,7 +84,11 @@
     });
 
     // Carregar municípios ao selecionar estado
-    document.getElementById("estado")?.addEventListener("change", function () {
+const estadoSelect = document.getElementById("estado");
+if (estadoSelect) {
+    estadoSelect.addEventListener("change", function () {
+
+
         const uf = this.value;
         const select = document.getElementById("municipios");
 
@@ -104,6 +108,7 @@
                 $('#municipios').trigger('change');
             });
     });
+        
 
     // Criar campos dinâmicos para cada município selecionado
     $('#municipios').on('change', function () {
