@@ -119,27 +119,72 @@
 
                     <input type="hidden" name="nome_${id}" value="${nome}">
 
+                    <!-- FORMADOR LOCAL -->
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <label class="form-label">Formador Local</label>
-                            <input type="text" name="formador_local_${id}" class="form-control">
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">PBA - Quantidade</label>
-                            <input type="number" name="pba_qtd_${id}" class="form-control" min="0">
+                            <select name="formador_local_${id}" class="form-select">
+                                <option value="">Selecione</option>
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                                <option value="Não identificado">Não identificado</option>
+                            </select>
                         </div>
                     </div>
 
+                    <hr>
+
+                    <!-- PBA -->
                     <div class="row mt-3">
                         <div class="col-md-6">
-                            <label class="form-label">EJA Alfabetização - Quantidade</label>
-                            <input type="number" name="eja_alf_qtd_${id}" class="form-control" min="0">
+                            <label class="form-label">Há turmas de PBA?</label>
+                            <select name="pba_${id}" class="form-select pba-select" data-id="${id}">
+                                <option value="">Selecione</option>
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                                <option value="Não sei">Não sei</option>
+                            </select>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">EJA Anos Iniciais - Quantidade</label>
-                            <input type="number" name="eja_ai_qtd_${id}" class="form-control" min="0">
+                            <label class="form-label">Quantas turmas?</label>
+                            <input type="number" name="pba_qtd_${id}" class="form-control pba-qtd" min="0" value="0" readonly>
+                        </div>
+                    </div>
+
+                    <!-- ALFABETIZAÇÃO EJA -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Há turmas de Alfabetização EJA?</label>
+                            <select name="eja_alf_${id}" class="form-select eja-alf-select" data-id="${id}">
+                                <option value="">Selecione</option>
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                                <option value="Não sei">Não sei</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Quantas turmas?</label>
+                            <input type="number" name="eja_alf_qtd_${id}" class="form-control eja-alf-qtd" min="0" value="0" readonly>
+                        </div>
+                    </div>
+
+                    <!-- EJA ANOS INICIAIS -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Há turmas de EJA - Anos Iniciais?</label>
+                            <select name="eja_ai_${id}" class="form-select eja-ai-select" data-id="${id}">
+                                <option value="">Selecione</option>
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                                <option value="Não sei">Não sei</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Quantas turmas?</label>
+                            <input type="number" name="eja_ai_qtd_${id}" class="form-control eja-ai-qtd" min="0" value="0" readonly>
                         </div>
                     </div>
 
@@ -158,7 +203,50 @@
                 </div>
             `;
         });
+
+        // Ativar lógica condicional após inserir os campos
+        ativarLogicaCondicional();
     });
+
+    // Função que ativa a lógica dos campos condicionais
+    function ativarLogicaCondicional() {
+
+        // PBA
+        $(".pba-select").on("change", function () {
+            const id = $(this).data("id");
+            const qtd = $(`input[name='pba_qtd_${id}']`);
+
+            if ($(this).val() === "Sim") {
+                qtd.prop("readonly", false);
+            } else {
+                qtd.val(0).prop("readonly", true);
+            }
+        });
+
+        // Alfabetização EJA
+        $(".eja-alf-select").on("change", function () {
+            const id = $(this).data("id");
+            const qtd = $(`input[name='eja_alf_qtd_${id}']`);
+
+            if ($(this).val() === "Sim") {
+                qtd.prop("readonly", false);
+            } else {
+                qtd.val(0).prop("readonly", true);
+            }
+        });
+
+        // EJA Anos Iniciais
+        $(".eja-ai-select").on("change", function () {
+            const id = $(this).data("id");
+            const qtd = $(`input[name='eja_ai_qtd_${id}']`);
+
+            if ($(this).val() === "Sim") {
+                qtd.prop("readonly", false);
+            } else {
+                qtd.val(0).prop("readonly", true);
+            }
+        });
+    }
 </script>
 
 </body>
