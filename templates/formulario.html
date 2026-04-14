@@ -85,7 +85,6 @@
         const uf = this.value;
         const select = document.getElementById("municipios");
 
-        // Mensagem temporária
         select.innerHTML = "<option>Carregando...</option>";
         $('#municipios').trigger('change');
 
@@ -99,21 +98,20 @@
                     select.add(opt);
                 });
 
-                // Atualiza Select2
                 $('#municipios').trigger('change');
             });
     });
 
-    // Criar campos dinâmicos para cada município selecionado
-    document.getElementById("municipios")?.addEventListener("change", function () {
-        const selecionados = Array.from(this.selectedOptions);
+    // Criar campos dinâmicos para cada município selecionado (compatível com Select2)
+    $('#municipios').on('change', function () {
+        const selecionados = $(this).select2('data');
         const area = document.getElementById("areaMunicipios");
 
         area.innerHTML = "";
 
-        selecionados.forEach(opt => {
-            const id = opt.value;
-            const nome = opt.textContent;
+        selecionados.forEach(item => {
+            const id = item.id;
+            const nome = item.text;
 
             area.innerHTML += `
                 <div class="card shadow p-3 mb-4">
