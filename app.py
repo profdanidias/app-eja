@@ -174,6 +174,9 @@ def dashboard():
     conn.close()
 
     dados = []
+    estados_set = set()
+    formadores_set = set()
+
     for r in rows:
         meses = [
             r[7] or 0, r[8] or 0, r[9] or 0, r[10] or 0, r[11] or 0,
@@ -191,8 +194,83 @@ def dashboard():
             "total": sum(meses),
             "data": r[16]
         })
+        estados_set.add(r[2])
+        formadores_set.add(r[0])
 
-    return render_template("dashboard.html", dados=dados)
+    estados_lista = sorted([e for e in estados_set if e])
+    formadores_lista = sorted([f for f in formadores_set if f])
+
+    return render_template(
+        "dashboard.html",
+        dados=dados,
+        estados_lista=estados_lista,
+        formadores_lista=formadores_lista
+    )
+
+
+# ================= API DADOS INICIAIS (GRÁFICOS) =================
+@app.route("/api/dashboard_data")
+def dashboard_data():
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT estado,
+               SUM(pba_qtd),
+               SUM(eja_alfabetizacao_qtd),
+               SUM(eja_anos_iniciais_qtd),
+               SUM(jan), SUM(fev), SUM(mar), SUM(abr), SUM(mai),
+               SUM(jun), SUM(jul), SUM(ago), SUM(setm)
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    estados = []
+    pba = []
+    eja_alf = []
+    eja_ai = []
+    meses = []
+
+    for r in rows:
+        estados.append(r[0])
+        pba.append(r[1] or 0)
+        eja_alf.append(r[2] or 0)
+        eja_ai.append(r[3] or 0)
+        meses.append([x or 0 for x in r[4:]])
+
+    return jsonify({
+        "estados": estados,
+        "pba": pba,
+        "eja_alf": eja_alf,
+        "eja_ai": eja_ai,
+        "meses": meses
+    })
+
+
+# ================= API MAPA BRASIL (INICIAL) =================
+@app.route("/api/mapa")
+def api_mapa():
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT estado,
+               SUM(pba_qtd + eja_alfabetizacao_qtd + eja_anos_iniciais_qtd)
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    dados = [{"uf": r[0], "total": r[1] or 0} for r in rows]
+
+    return jsonify(dados)
 
 
 # ================= API FILTROS (TABELA + CARDS + GRÁFICOS + MAPA) =================
@@ -239,9 +317,9 @@ def filtrar():
     rows = cur.fetchall()
     conn.close()
 
-    # ======== MONTAR RESPOSTA COMPLETA ========
     tabela = []
-    estados = {}
+    estados_totais = {}
+    meses_por_estado = {}
     pba_total = 0
     eja_alf_total = 0
     eja_ai_total = 0
@@ -260,20 +338,22 @@ def filtrar():
             "pba": r[4] or 0,
             "eja_alf": r[5] or 0,
             "eja_ai": r[6] or 0,
-            "total": total_mes,
             "data": r[16]
         })
 
-        # Totais para cards
         pba_total += r[4] or 0
         eja_alf_total += r[5] or 0
         eja_ai_total += r[6] or 0
 
-        # Totais por estado (gráfico + mapa)
         uf = r[2]
-        if uf not in estados:
-            estados[uf] = 0
-        estados[uf] += total_mes
+        if uf not in estados_totais:
+            estados_totais[uf] = 0
+        estados_totais[uf] += total_mes
+
+        if uf not in meses_por_estado:
+            meses_por_estado[uf] = [0]*9
+        for i in range(9):
+            meses_por_estado[uf][i] += meses[i]
 
     return jsonify({
         "tabela": tabela,
@@ -283,7 +363,8 @@ def filtrar():
             "eja_ai": eja_ai_total,
             "geral": pba_total + eja_alf_total + eja_ai_total
         },
-        "estados": estados
+        "estados": estados_totais,
+        "meses": meses_por_estado
     })
 
 

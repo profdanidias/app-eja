@@ -43,8 +43,8 @@
                 <label>Estado</label>
                 <select id="filtroEstado" class="form-select">
                     <option value="">Todos</option>
-                    {% for d in dados|unique(attribute='estado') %}
-                        <option value="{{ d.estado }}">{{ d.estado }}</option>
+                    {% for e in estados_lista %}
+                        <option value="{{ e }}">{{ e }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -53,8 +53,8 @@
                 <label>Formador</label>
                 <select id="filtroFormador" class="form-select">
                     <option value="">Todos</option>
-                    {% for d in dados|unique(attribute='formador') %}
-                        <option value="{{ d.formador }}">{{ d.formador }}</option>
+                    {% for f in formadores_lista %}
+                        <option value="{{ f }}">{{ f }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -77,29 +77,29 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card shadow p-3">
-                <h5>Total Geral</h5>
-                <h2 id="totalGeral">0</h2>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card shadow p-3">
-                <h5>Total PBA</h5>
+                <h5>Total de turmas PBA</h5>
                 <h2 id="totalPBA">0</h2>
             </div>
         </div>
 
         <div class="col-md-3">
             <div class="card shadow p-3">
-                <h5>Total EJA Alfabetização</h5>
+                <h5>Total de turmas EJA Alfabetização</h5>
                 <h2 id="totalEJAAlf">0</h2>
             </div>
         </div>
 
         <div class="col-md-3">
             <div class="card shadow p-3">
-                <h5>Total EJA Anos Iniciais</h5>
+                <h5>Total de turmas EJA Anos Iniciais</h5>
                 <h2 id="totalEJAAI">0</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow p-3">
+                <h5>Total Geral de Turmas</h5>
+                <h2 id="totalGeral">0</h2>
             </div>
         </div>
     </div>
@@ -108,7 +108,7 @@
     <div class="row">
         <div class="col-md-6">
             <div class="card shadow p-3 mb-4">
-                <h5>Total por Estado</h5>
+                <h5>Total de Turmas por Estado</h5>
                 <div class="chart-container">
                     <canvas id="graficoEstados"></canvas>
                 </div>
@@ -117,11 +117,19 @@
 
         <div class="col-md-6">
             <div class="card shadow p-3 mb-4">
-                <h5>Distribuição por Programa</h5>
+                <h5>Distribuição de Turmas por Programa</h5>
                 <div class="chart-container">
                     <canvas id="graficoProgramas"></canvas>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ================= GRÁFICO LINHA ================= -->
+    <div class="card shadow p-3 mb-4">
+        <h5>Movimento de participantes por mês (por estado)</h5>
+        <div class="chart-container">
+            <canvas id="graficoLinha"></canvas>
         </div>
     </div>
 
@@ -140,10 +148,9 @@
                     <th>Formador</th>
                     <th>Município</th>
                     <th>Estado</th>
-                    <th>PBA</th>
-                    <th>EJA Alf.</th>
-                    <th>EJA AI</th>
-                    <th>Total Meses</th>
+                    <th>Turmas PBA</th>
+                    <th>Turmas EJA Alf.</th>
+                    <th>Turmas EJA AI</th>
                     <th>Data</th>
                 </tr>
             </thead>
@@ -156,7 +163,6 @@
                     <td>{{ d.pba }}</td>
                     <td>{{ d.eja_alf }}</td>
                     <td>{{ d.eja_ai }}</td>
-                    <td>{{ d.total }}</td>
                     <td>{{ d.data }}</td>
                 </tr>
                 {% endfor %}
@@ -173,13 +179,15 @@
         let tabela;
         let graficoEstados;
         let graficoProgramas;
+        let graficoLinha;
         let mapaBrasil;
+
+        const MESES_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set"];
 
         $(document).ready(function () {
 
             tabela = $('#tabela').DataTable();
 
-            // Carregar dados iniciais
             fetch("/api/dashboard_data")
                 .then(r => r.json())
                 .then(data => montarDashboard(data));
@@ -190,9 +198,6 @@
         });
 
 
-        // ============================
-        // APLICAR FILTROS
-        // ============================
         function aplicarFiltros() {
 
             const filtros = {
@@ -211,15 +216,12 @@
             .then(res => {
                 atualizarTabela(res.tabela);
                 atualizarCards(res.cards);
-                atualizarGraficos(res.estados);
+                atualizarGraficos(res.estados, res.meses);
                 atualizarMapa(res.estados);
             });
         }
 
 
-        // ============================
-        // ATUALIZAR TABELA
-        // ============================
         function atualizarTabela(dados) {
 
             tabela.clear();
@@ -232,7 +234,6 @@
                     d.pba,
                     d.eja_alf,
                     d.eja_ai,
-                    d.total,
                     d.data
                 ]);
             });
@@ -241,9 +242,6 @@
         }
 
 
-        // ============================
-        // ATUALIZAR CARDS
-        // ============================
         function atualizarCards(cards) {
             document.getElementById("totalPBA").innerText = cards.pba;
             document.getElementById("totalEJAAlf").innerText = cards.eja_alf;
@@ -252,9 +250,6 @@
         }
 
 
-        // ============================
-        // GRÁFICOS INICIAIS
-        // ============================
         function montarDashboard(data) {
 
             const totalPBA = data.pba.reduce((a,b)=>a+b,0);
@@ -267,14 +262,13 @@
             document.getElementById("totalEJAAI").innerText = totalEJAAI;
             document.getElementById("totalGeral").innerText = totalGeral;
 
-            // Gráfico de barras
             graficoEstados = new Chart(document.getElementById("graficoEstados"), {
                 type: "bar",
                 data: {
                     labels: data.estados,
                     datasets: [{
-                        label: "Total Geral",
-                        data: data.pba.map((v,i)=>v + data.eja_alf[i] + data.eja_ai[i]),
+                        label: "Total de Turmas",
+                        data: data.meses.map(m => m.reduce((a,b)=>a+b,0)),
                         backgroundColor: "#4e73df"
                     }]
                 },
@@ -284,7 +278,6 @@
                 }
             });
 
-            // Gráfico de pizza
             graficoProgramas = new Chart(document.getElementById("graficoProgramas"), {
                 type: "pie",
                 data: {
@@ -296,36 +289,58 @@
                 },
                 options: { responsive: true }
             });
+
+            const datasetsLinha = data.estados.map((uf, idx) => ({
+                label: uf,
+                data: data.meses[idx],
+                borderWidth: 2,
+                fill: false
+            }));
+
+            graficoLinha = new Chart(document.getElementById("graficoLinha"), {
+                type: "line",
+                data: {
+                    labels: MESES_LABELS,
+                    datasets: datasetsLinha
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
         }
 
 
-        // ============================
-        // ATUALIZAR GRÁFICOS COM FILTROS
-        // ============================
-        function atualizarGraficos(estados) {
+        function atualizarGraficos(estados, meses_por_estado) {
 
             const labels = Object.keys(estados);
-            const valores = Object.values(estados);
+            const totais = Object.values(estados);
 
-            // Atualizar gráfico de barras
             graficoEstados.data.labels = labels;
-            graficoEstados.data.datasets[0].data = valores;
+            graficoEstados.data.datasets[0].data = totais;
             graficoEstados.update();
 
-            // Atualizar gráfico de pizza
-            const totalPBA = valores.reduce((a,b)=>a+b,0);
+            const totalGeral = totais.reduce((a,b)=>a+b,0);
             graficoProgramas.data.datasets[0].data = [
-                totalPBA * 0.33,
-                totalPBA * 0.33,
-                totalPBA * 0.34
+                totalGeral * 0.33,
+                totalGeral * 0.33,
+                totalGeral * 0.34
             ];
             graficoProgramas.update();
+
+            const datasetsLinha = Object.keys(meses_por_estado).map(uf => ({
+                label: uf,
+                data: meses_por_estado[uf],
+                borderWidth: 2,
+                fill: false
+            }));
+
+            graficoLinha.data.labels = MESES_LABELS;
+            graficoLinha.data.datasets = datasetsLinha;
+            graficoLinha.update();
         }
 
 
-        // ============================
-        // MAPA INICIAL
-        // ============================
         function montarMapa(estados) {
 
             const dados = estados.map(e => ({
@@ -349,15 +364,20 @@
                     data: dados,
                     name: 'Participantes',
                     states: { hover: { color: '#ffcc00' }},
-                    dataLabels: { enabled: true, format: '{point.name}' }
+                    dataLabels: { enabled: true, format: '{point.name}' },
+                    point: {
+                        events: {
+                            click: function () {
+                                document.getElementById("filtroEstado").value = this['hc-key'].split('-')[1].toUpperCase();
+                                aplicarFiltros();
+                            }
+                        }
+                    }
                 }]
             });
         }
 
 
-        // ============================
-        // ATUALIZAR MAPA COM FILTROS
-        // ============================
         function atualizarMapa(estados) {
 
             const dados = Object.keys(estados).map(uf => ({
@@ -371,4 +391,4 @@
     </script>
 
 </body>
-</html>               
+</html>             
