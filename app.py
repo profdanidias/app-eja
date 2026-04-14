@@ -313,7 +313,7 @@ def dashboard():
             usuario_id, municipio_nome, estado, formador_local,
             pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
             jan, fev, mar, abr, mai, jun, jul, ago, setm,
-            data_envio
+            data_envio, municipio_id
         FROM respostas
         ORDER BY 
             date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
@@ -342,7 +342,8 @@ def dashboard():
             "eja_ai": r[6] or 0,
             "meses": meses,
             "total": sum(meses),
-            "data": r[16]
+            "data": r[16],
+            "municipio_id": r[17]
         })
         estados_set.add(r[2])
         formadores_set.add(r[0])
@@ -544,7 +545,8 @@ def filtrar():
             "pba": r[4] or 0,
             "eja_alf": r[5] or 0,
             "eja_ai": r[6] or 0,
-            "data": r[16]
+            "data": r[16],
+            "municipio_id": r[17]
         })
 
         pba_total += r[4] or 0
@@ -599,6 +601,43 @@ def exportar_excel():
         output,
         as_attachment=True,
         download_name="dados.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+# ================= EXPORTAÇÃO EXCEL POR MUNICÍPIO =================
+@app.route("/exportar_municipio/<municipio_id>")
+def exportar_municipio(municipio_id):
+
+    if session.get("email") not in GESTORES:
+        return "Acesso negado"
+
+    conn = conectar()
+    df = pd.read_sql_query("""
+        SELECT *
+        FROM respostas
+        WHERE municipio_id = ?
+        ORDER BY 
+            date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
+            time(substr(data_envio,12)) DESC
+    """, conn, params=(municipio_id,))
+    conn.close()
+
+    if df.empty:
+        return "Nenhum registro encontrado para este município."
+
+    nome_municipio = df["municipio_nome"].iloc[0] or "municipio"
+    hoje = datetime.now().strftime("%Y-%m-%d")
+    nome_arquivo = f"historico_{nome_municipio}_{hoje}.xlsx".replace(" ", "_")
+
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=nome_arquivo,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
