@@ -49,7 +49,7 @@ def index():
 
 def conectar():
     return psycopg2.connect(
-        host="dpg-d7f5m8rbc2fs738hmrs0-a.oregon-postgres.render.com",
+        host="dpg-d7f5m8rbc2fs738hmrs0-a",
         database="postgresql_eja",
         user="postgresql_eja_user",
         password="ieeth18XxaNhJOLVmas0VALthQR42Pyr",
