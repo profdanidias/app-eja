@@ -51,8 +51,6 @@
 <br>
 <button type="submit">Salvar Informações</button>
 
-</form>
-
 {% if is_gestor %}
     <br><br>
     <button type="button" onclick="abrirPainelAdmin()" 
@@ -60,6 +58,8 @@
         Painel Admin
     </button>
 {% endif %}
+
+</form>
 
 </div>
 
@@ -237,7 +237,10 @@ function gerarMeses(id){
             html += `
             <div style="display:inline-block;margin-right:10px;">
             ${m[0]}:
-            <input class="mes" type="number" min="0" name="${m[1]}_${id}" style="width:70px;">
+            <input class="mes" type="number" min="0" 
+                   name="${m[1]}_${id}" 
+                   data-mes-num="${numeroMes}"
+                   style="width:70px;">
             </div>
             `;
         }
@@ -254,13 +257,76 @@ function controlarQuantidade(select,id){
 
     if (select.value === "não" || select.value === "não sei"){
         campo.value = 0;
-        campo.disabled = true;
+        campo.disabled = false; // ainda pode ajustar para 0
     } else {
         campo.disabled = false;
     }
 }
 
-// ================= MUNICÍPIOS =================
+// ================= CARREGAR DADOS ANTERIORES =================
+function preencherDadosAnteriores(id){
+
+    fetch("/api/dados_municipio/" + id)
+    .then(r => r.json())
+    .then(d => {
+        if (!d.existe) return;
+
+        // formador local
+        let fl = document.querySelector(`[name="formador_local_${id}"]`);
+        if (fl) fl.value = d.formador_local || "";
+
+        // PBA
+        let pba = document.querySelector(`[name="pba_${id}"]`);
+        let pba_qtd = document.getElementById(`pba_qtd_${id}`);
+        if (pba) pba.value = d.pba || "";
+        if (pba_qtd) {
+            pba_qtd.value = d.pba_qtd || 0;
+            pba_qtd.disabled = false;
+        }
+
+        // EJA Alf
+        let eja_alf = document.querySelector(`[name="eja_alf_${id}"]`);
+        let eja_alf_qtd = document.getElementById(`eja_alf_qtd_${id}`);
+        if (eja_alf) eja_alf.value = d.eja_alf || "";
+        if (eja_alf_qtd) {
+            eja_alf_qtd.value = d.eja_alf_qtd || 0;
+            eja_alf_qtd.disabled = false;
+        }
+
+        // EJA AI
+        let eja_ai = document.querySelector(`[name="eja_ai_${id}"]`);
+        let eja_ai_qtd = document.getElementById(`eja_ai_qtd_${id}`);
+        if (eja_ai) eja_ai.value = d.eja_ai || "";
+        if (eja_ai_qtd) {
+            eja_ai_qtd.value = d.eja_ai_qtd || 0;
+            eja_ai_qtd.disabled = false;
+        }
+
+        // Meses
+        const mesesDados = d.meses || {};
+        const camposMes = document.querySelectorAll(`#bloco_${id} .mes`);
+
+        camposMes.forEach(input => {
+            const nome = input.name.split("_")[0]; // jan, fev, ...
+            const numMes = parseInt(input.dataset.mesNum);
+            const valorAnterior = mesesDados[nome] || 0;
+
+            if (numMes < mesAtual && valorAnterior > 0){
+                input.value = valorAnterior;
+                input.readOnly = true;
+            } else if (numMes === mesAtual){
+                input.value = valorAnterior || "";
+                input.readOnly = false;
+            } else if (numMes < mesAtual && (!valorAnterior || valorAnterior === 0)){
+                input.value = valorAnterior;
+                input.readOnly = false;
+            }
+        });
+
+    });
+}
+
+// ================= MUNICÍPIOS / BLOCOS =================
 let selecionados = new Set();
 
 document.getElementById("municipios").addEventListener("change", function(){
@@ -331,6 +397,9 @@ document.getElementById("municipios").addEventListener("change", function(){
             `;
 
             blocos.appendChild(div);
+
+            // carregar dados anteriores, se existirem
+            preencherDadosAnteriores(id);
         }
 
     });
@@ -347,6 +416,8 @@ function removerMunicipio(id){
         if (o.value==id) o.selected=false;
     });
 }
+
+// ================= PAINEL ADMIN =================
 function abrirPainelAdmin(){
     let senha = prompt("Digite a senha de acesso ao Painel Admin:");
 
@@ -356,6 +427,7 @@ function abrirPainelAdmin(){
         alert("Senha incorreta.");
     }
 }
+
 </script>
 
 </body>

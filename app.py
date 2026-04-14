@@ -81,7 +81,7 @@ def definir_estado_fixo(email, estado):
     conn.close()
 
 
-# ================= LOGIN / PERFIL =================
+# ================= LOGIN =================
 @app.route("/")
 def auto_login():
     nome = request.args.get("nome")
@@ -139,7 +139,60 @@ def municipios(uf):
     ).json())
 
 
-# ================= SALVAR FORMULÁRIO =================
+# ================= API DADOS ANTERIORES MUNICÍPIO =================
+@app.route("/api/dados_municipio/<municipio_id>")
+def api_dados_municipio(municipio_id):
+    usuario = session.get("nome")
+    if not usuario:
+        return jsonify({"existe": False})
+
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT 
+            formador_local,
+            pba, pba_qtd,
+            eja_alfabetizacao, eja_alfabetizacao_qtd,
+            eja_anos_iniciais, eja_anos_iniciais_qtd,
+            jan, fev, mar, abr, mai, jun, jul, ago, setm
+        FROM respostas
+        WHERE usuario_id = ? AND municipio_id = ?
+        ORDER BY 
+            date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
+            time(substr(data_envio,12)) DESC
+        LIMIT 1
+    """, (usuario, municipio_id))
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"existe": False})
+
+    dados = {
+        "existe": True,
+        "formador_local": row[0] or "",
+        "pba": row[1] or "",
+        "pba_qtd": row[2] or 0,
+        "eja_alf": row[3] or "",
+        "eja_alf_qtd": row[4] or 0,
+        "eja_ai": row[5] or "",
+        "eja_ai_qtd": row[6] or 0,
+        "meses": {
+            "jan": row[7] or 0,
+            "fev": row[8] or 0,
+            "mar": row[9] or 0,
+            "abr": row[10] or 0,
+            "mai": row[11] or 0,
+            "jun": row[12] or 0,
+            "jul": row[13] or 0,
+            "ago": row[14] or 0,
+            "setm": row[15] or 0
+        }
+    }
+    return jsonify(dados)
+
+
+# ================= SALVAR =================
 @app.route("/salvar", methods=["POST"])
 def salvar():
 
@@ -202,7 +255,7 @@ def salvar():
     return redirect("/resumo_envio")
 
 
-# ================= RESUMO DO ENVIO =================
+# ================= RESUMO / FINALIZAÇÃO =================
 @app.route("/resumo_envio")
 def resumo_envio():
     ids = session.get("ids_ultimo_envio")
@@ -245,7 +298,7 @@ def finalizar_envio():
     return render_template("mensagem_final.html")
 
 
-# ================= DASHBOARD (APENAS GESTOR) =================
+# ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
 
@@ -305,7 +358,223 @@ def dashboard():
     )
 
 
-# ================= EXPORTAÇÕES (GESTOR) =================
+# ================= API DADOS INICIAIS (GRÁFICOS) =================
+@app.route("/api/dashboard_data")
+def dashboard_data():
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT estado,
+               SUM(pba_qtd),
+               SUM(eja_alfabetizacao_qtd),
+               SUM(eja_anos_iniciais_qtd),
+               SUM(jan), SUM(fev), SUM(mar), SUM(abr), SUM(mai),
+               SUM(jun), SUM(jul), SUM(ago), SUM(setm)
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    estados = []
+    pba = []
+    eja_alf = []
+    eja_ai = []
+    meses = []
+
+    for r in rows:
+        estados.append(r[0])
+        pba.append(r[1] or 0)
+        eja_alf.append(r[2] or 0)
+        eja_ai.append(r[3] or 0)
+        meses.append([x or 0 for x in r[4:]])
+
+    return jsonify({
+        "estados": estados,
+        "pba": pba,
+        "eja_alf": eja_alf,
+        "eja_ai": eja_ai,
+        "meses": meses
+    })
+
+
+# ================= MAPA BRASIL POR MÊS =================
+MESES_COLUNAS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "setm"]
+
+
+def coluna_mes_atual():
+    mes_idx = datetime.now().month
+    if mes_idx < 1:
+        mes_idx = 1
+    if mes_idx > 9:
+        mes_idx = 9
+    return MESES_COLUNAS[mes_idx - 1]
+
+
+@app.route("/api/mapa")
+def api_mapa():
+    coluna = coluna_mes_atual()
+    return _dados_mapa_por_coluna(coluna)
+
+
+@app.route("/api/mapa_mes/<coluna>")
+def api_mapa_mes(coluna):
+    MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "setm"]
+
+    if coluna not in MESES:
+        return jsonify([])
+
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(f"""
+        SELECT estado, SUM(COALESCE({coluna}, 0))
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    dados = [{"uf": r[0], "total": r[1] or 0} for r in rows]
+
+    return jsonify(dados)
+
+
+def _dados_mapa_por_coluna(coluna):
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute(f"""
+        SELECT estado,
+               SUM(COALESCE({coluna}, 0))
+        FROM respostas
+        GROUP BY estado
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    dados = [{"uf": r[0], "total": r[1] or 0} for r in rows]
+
+    return jsonify(dados)
+
+
+# ================= API FILTROS =================
+@app.route("/api/filtrar", methods=["POST"])
+def filtrar():
+
+    filtros = request.json
+    estado = filtros.get("estado")
+    formador = filtros.get("formador")
+    municipio_raw = filtros.get("municipio")
+    data_ini = filtros.get("data_ini")
+    data_fim = filtros.get("data_fim")
+
+    municipio_id = None
+    if municipio_raw:
+        partes = municipio_raw.split("|", 1)
+        municipio_id = partes[0]
+
+    query = """
+        SELECT 
+            usuario_id, municipio_nome, estado, formador_local,
+            pba_qtd, eja_alfabetizacao_qtd, eja_anos_iniciais_qtd,
+            jan, fev, mar, abr, mai, jun, jul, ago, setm,
+            data_envio, municipio_id
+        FROM respostas
+        WHERE 1=1
+    """
+
+    params = []
+
+    if estado:
+        query += " AND estado = ?"
+        params.append(estado)
+
+    if formador:
+        query += " AND usuario_id = ?"
+        params.append(formador)
+
+    if municipio_id:
+        query += " AND municipio_id = ?"
+        params.append(municipio_id)
+
+    if data_ini:
+        query += " AND date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) >= date(?)"
+        params.append(data_ini)
+
+    if data_fim:
+        query += " AND date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) <= date(?)"
+        params.append(data_fim)
+
+    query += """
+        ORDER BY 
+            date(substr(data_envio,7,4)||'-'||substr(data_envio,4,2)||'-'||substr(data_envio,1,2)) DESC,
+            time(substr(data_envio,12)) DESC
+    """
+
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+
+    tabela = []
+    estados_totais = {}
+    meses_por_estado = {}
+    pba_total = 0
+    eja_alf_total = 0
+    eja_ai_total = 0
+
+    for r in rows:
+        meses = [
+            r[7] or 0, r[8] or 0, r[9] or 0, r[10] or 0, r[11] or 0,
+            r[12] or 0, r[13] or 0, r[14] or 0, r[15] or 0
+        ]
+        total_mes = sum(meses)
+
+        tabela.append({
+            "formador": r[0],
+            "municipio": r[1],
+            "estado": r[2],
+            "pba": r[4] or 0,
+            "eja_alf": r[5] or 0,
+            "eja_ai": r[6] or 0,
+            "data": r[16]
+        })
+
+        pba_total += r[4] or 0
+        eja_alf_total += r[5] or 0
+        eja_ai_total += r[6] or 0
+
+        uf = r[2]
+        if uf not in estados_totais:
+            estados_totais[uf] = 0
+        estados_totais[uf] += total_mes
+
+        if uf not in meses_por_estado:
+            meses_por_estado[uf] = [0]*9
+        for i in range(9):
+            meses_por_estado[uf][i] += meses[i]
+
+    return jsonify({
+        "tabela": tabela,
+        "cards": {
+            "pba": pba_total,
+            "eja_alf": eja_alf_total,
+            "eja_ai": eja_ai_total,
+            "geral": pba_total + eja_alf_total + eja_ai_total
+        },
+        "estados": estados_totais,
+        "meses": meses_por_estado
+    })
+
+
+# ================= EXPORTAÇÃO EXCEL =================
 @app.route("/exportar_excel")
 def exportar_excel():
 
@@ -334,6 +603,7 @@ def exportar_excel():
     )
 
 
+# ================= EXPORTAÇÃO PDF =================
 @app.route("/exportar_pdf")
 def exportar_pdf():
 
