@@ -13,33 +13,33 @@ from reportlab.lib.pagesizes import letter
 app = Flask(__name__)
 app.secret_key = "SUA_SECRET_KEY_AQUI"
 
+
+
+#========== LOGIN SEM MOODLE =============
 @app.before_request
 def controle_de_acesso():
-    # 1. Permitir login via URL (Moodle → app)
-    nome = request.args.get("nome")
-    email = request.args.get("email")
+    # Permitir acesso à página de login e arquivos estáticos
+    if request.path == "/" or request.path.startswith("/static"):
+        return
 
-    if nome and email:
-        session["nome"] = nome
-        session["email"] = email
-        return  # segue normalmente
-
-    # 2. Se já está logada, segue
+    # Se já está logado, segue
     if "email" in session:
         return
 
-    # 3. Rotas que NÃO exigem login
-    rotas_livres = [
-        "/", "/login",
-        "/lti/init", "/lti/login", "/lti/jwks",
-        "/static", "/favicon.ico"
-    ]
-
-    if any(request.path.startswith(r) for r in rotas_livres):
-        return
-
-    # 4. Se não está logada e não é rota livre → volta para /
+    # Caso contrário, volta para o login
     return redirect("/")
+
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        session["nome"] = request.form.get("nome")
+        session["email"] = request.form.get("email")
+        return redirect("/formulario")
+
+    return render_template("login.html")
+
+
 
 # ================= CONFIGURAÇÃO DO POSTGRES =================
 
@@ -77,17 +77,6 @@ def listar_municipios_por_uf(uf):
     rows = cur.fetchall()
     conn.close()
     return [{"id": r[0], "nome": r[1]} for r in rows]
-
-# ================= LOGIN =================
-
-@app.route("/")
-def index():
-    # Se já está logada, vai direto para o formulário
-    if "email" in session:
-        return redirect("/formulario")
-
-    # Se não está logada, mostra a tela de boas-vindas
-    return render_template("login.html")
 
 # ================= FORMULÁRIO =================
 
