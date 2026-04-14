@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumo do Envio</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+        }
+        button {
+            padding: 12px 25px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>Resumo das Informações Enviadas</h2>
+    <p>Confira abaixo os dados registrados para os municípios selecionados.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Município</th>
+                <th>Estado</th>
+                <th>Formador Local</th>
+                <th>PBA</th>
+                <th>EJA Alf.</th>
+                <th>EJA AI</th>
+                <th>Total Participantes (Jan–Set)</th>
+                <th>Data/Hora</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in dados %}
+            <tr>
+                <td>{{ d.municipio }}</td>
+                <td>{{ d.estado }}</td>
+                <td>{{ d.formador_local }}</td>
+                <td>{{ d.pba }}</td>
+                <td>{{ d.eja_alf }}</td>
+                <td>{{ d.eja_ai }}</td>
+                <td>{{ d.meses|sum }}</td>
+                <td>{{ d.data }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br><br>
+
+    <form method="POST" action="/finalizar_envio">
+        <button type="submit">Confirmar e Finalizar Envio</button>
+    </form>
+
+    <br>
+    <a href="/formulario">Voltar ao formulário</a>
+
+</div>
+
+</body>
+</html>

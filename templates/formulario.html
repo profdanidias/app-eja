@@ -27,14 +27,22 @@
 <form method="POST" action="/salvar" onsubmit="return validarFormulario()">
 
 <label><b>Estado:</b></label><br>
-<select id="estado" name="estado" required>
-<option value="" disabled selected>ESCOLHA O SEU ESTADO</option>
+
+<select id="estado" name="estado" required {% if estado_fixo %}disabled{% endif %}>
+    {% if not estado_fixo %}
+        <option value="" disabled selected>ESCOLHA O SEU ESTADO</option>
+    {% endif %}
 </select>
+
+{% if estado_fixo %}
+    <input type="hidden" name="estado" value="{{ estado_fixo }}">
+    <p style="color:#555;">Estado fixado: <b>{{ estado_fixo }}</b>. Alterações somente pelo gestor.</p>
+{% endif %}
 
 <br><br>
 
 <label><b>Municípios (pode selecionar vários):</b></label><br>
-<select id="municipios" multiple size="8" name="municipios_select"></select>
+<select id="municipios" multiple size="8" name="municipios"></select>
 
 <br><br>
 
@@ -42,15 +50,6 @@
 
 <br>
 <button type="submit">Salvar Informações</button>
-
-{% if is_gestor %}
-<br><br>
-<a href="/dashboard">
-<button type="button" style="background:#28a745; color:white;">
-VER DASHBOARD
-</button>
-</a>
-{% endif %}
 
 </form>
 
@@ -125,7 +124,6 @@ function validarFormulario(){
 
     });
 
-    // valida meses visíveis
     let meses = document.querySelectorAll(".mes");
 
     meses.forEach(input => {
@@ -146,7 +144,6 @@ function validarFormulario(){
     return valido;
 }
 
-// remove erro ao digitar
 document.addEventListener("input", function(e){
     if (e.target.classList.contains("erro")){
         e.target.classList.remove("erro");
@@ -165,18 +162,44 @@ fetch("/estados")
         opt.text=e.nome;
         select.appendChild(opt);
     });
+
+    {% if estado_fixo %}
+        select.value = "{{ estado_fixo }}";
+        carregarMunicipiosEstadoFixo("{{ estado_fixo }}");
+    {% endif %}
 });
 
-// ================= MUNICÍPIOS =================
-document.getElementById("estado").addEventListener("change", function(){
-
-    fetch("/municipios/"+this.value)
+function carregarMunicipiosEstadoFixo(uf){
+    fetch("/municipios/"+uf)
     .then(r=>r.json())
     .then(muns=>{
         let select=document.getElementById("municipios");
         select.innerHTML="";
-        selecionados.clear();
-        document.getElementById("blocos").innerHTML = "";
+        muns.forEach(m=>{
+            let opt=document.createElement("option");
+            opt.value=m.id;
+            opt.text=m.nome;
+            select.appendChild(opt);
+        });
+    });
+}
+
+// ================= MUNICÍPIOS =================
+document.getElementById("estado").addEventListener("change", function(){
+
+    const uf = this.value;
+    const nomeEstado = this.options[this.selectedIndex].text;
+
+    if (!confirm("Você confirma que o seu Estado é: " + nomeEstado + " ("+uf+") ?\n\nApós confirmar, este Estado ficará fixo para seus próximos envios.")) {
+        this.value = "";
+        return;
+    }
+
+    fetch("/municipios/"+uf)
+    .then(r=>r.json())
+    .then(muns=>{
+        let select=document.getElementById("municipios");
+        select.innerHTML="";
         muns.forEach(m=>{
             let opt=document.createElement("option");
             opt.value=m.id;
@@ -254,7 +277,6 @@ document.getElementById("municipios").addEventListener("change", function(){
 
             <button type="button" onclick="removerMunicipio('${id}')">RETIRAR MUNICÍPIO</button><br><br>
 
-            <!-- município incluído explicitamente no POST -->
             <input type="hidden" name="municipios" value="${id}">
             <input type="hidden" name="nome_${id}" value="${nome}">
 
