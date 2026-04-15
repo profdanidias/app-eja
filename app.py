@@ -11,6 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import letter
 
 app = Flask(__name__)
+app.debug = True
 app.secret_key = "SUA_SECRET_KEY_AQUI"
 
 
