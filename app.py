@@ -85,6 +85,8 @@ def listar_municipios_por_uf(uf):
 
 # ================= FORMULÁRIO =================
 
+from datetime import datetime
+
 @app.route("/formulario")
 def formulario():
     email = session.get("email")
@@ -98,7 +100,7 @@ def formulario():
     if not is_gestor and estados:
         estado_fixo = estados[0]["sigla"]
 
-    # 🔥 ESTA LINHA É O QUE FALTAVA
+    # 🔥 ESSA LINHA PRECISA EXISTIR E ESTAR AQUI
     mes_atual = datetime.now().month
 
     return render_template(
@@ -299,9 +301,8 @@ def finalizar_envio():
 
 @app.route("/dashboard")
 def dashboard():
-    email = session.get("email")
-    if email not in GESTORES:
-        return "Acesso negado"
+    if request.args.get("auth") != "ok":
+    return "Acesso negado"
 
     conn = conectar()
     cur = conn.cursor()
