@@ -89,13 +89,8 @@ from datetime import datetime
 
 @app.route("/formulario")
 def formulario():
-    email = session.get("email")
-    if not email:
-        return redirect("/")
-
-    is_gestor = email in GESTORES
+    is_gestor = request.args.get("auth") == "ok"
     estados = listar_estados()
-
     estado_fixo = None
     if not is_gestor and estados:
         estado_fixo = estados[0]["sigla"]
@@ -299,10 +294,12 @@ def finalizar_envio():
 
 # ================= DASHBOARD =================
 
+from flask import request   # certifique-se de ter este import no topo
+
 @app.route("/dashboard")
 def dashboard():
     if request.args.get("auth") != "ok":
-    return "Acesso negado"
+        return "Acesso negado"
 
     conn = conectar()
     cur = conn.cursor()
