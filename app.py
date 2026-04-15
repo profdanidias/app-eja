@@ -98,11 +98,15 @@ def formulario():
     if not is_gestor and estados:
         estado_fixo = estados[0]["sigla"]
 
+    # 🔥 ESTA LINHA É O QUE FALTAVA
+    mes_atual = datetime.now().month
+
     return render_template(
         "formulario.html",
         is_gestor=is_gestor,
         estados=estados,
-        estado_fixo=estado_fixo
+        estado_fixo=estado_fixo,
+        mes_atual=mes_atual
     )
 
 @app.route("/municipios/<uf>")
