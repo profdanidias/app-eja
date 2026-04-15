@@ -231,8 +231,7 @@ $('#municipios').on('change', function() {
 
                 <div class="row">
                     {% set meses = ['jan','fev','mar','abr','mai','jun','jul','ago','setm','out','nov','dez'] %}
-                    {% set mes_atual = current_month %}
-                    {% for mes in meses[:mes_atual] %}
+{% for mes in meses[:mes_atual] %}
                     <div class="col-md-4 mb-3">
                         <label>{{ mes|upper }}</label>
                         <input type="number" min="0" name="{{ mes }}_${id}" class="form-control" value="0" required>
