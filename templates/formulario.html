@@ -95,9 +95,20 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-    $(document).ready(function() {
-        $('#estado').select2();
-        $('#municipios').select2();
+
+    // Inicializar Select2 SOMENTE depois que o DOM estiver pronto
+    $(function() {
+        setTimeout(() => {
+            $('#estado').select2({
+                placeholder: "Selecione um estado",
+                width: '100%'
+            });
+
+            $('#municipios').select2({
+                placeholder: "Selecione os municípios",
+                width: '100%'
+            });
+        }, 50);
     });
 
     // Carregar municípios ao escolher estado
@@ -113,6 +124,8 @@
                     `<option value="${m.id}" data-nome="${m.nome}">${m.nome}</option>`
                 );
             });
+
+            $('#municipios').trigger('change.select2');
         });
     });
 
@@ -217,10 +230,8 @@
     $(document).on('click', '.btn-remover', function() {
         let id = $(this).data('id');
 
-        // Remove o card visualmente
         $('#card-' + id).remove();
 
-        // Desmarca o município no Select2
         let select = $('#municipios');
         let valores = select.val().filter(v => v !== id);
         select.val(valores).trigger('change');
@@ -253,6 +264,7 @@
         if (val === 'Sim') campo.prop('disabled', false);
         else { campo.val(0); campo.prop('disabled', true); }
     });
+
 </script>
 
 </body>
