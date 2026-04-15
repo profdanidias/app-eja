@@ -164,28 +164,45 @@ def salvar():
     municipios = request.form.getlist("municipios")
     data_envio = datetime.now()
 
+    # Meses dinâmicos (até o mês atual)
+    meses_completos = ["jan","fev","mar","abr","mai","jun","jul","ago","setm","out","nov","dez"]
+    mes_atual = datetime.now().month
+    meses = meses_completos[:mes_atual]
+
     ids = []
 
     for m in municipios:
+
+        # Buscar nome do município no banco
+        cur.execute("SELECT nome FROM municipios WHERE id = %s", (m,))
+        municipio_nome = cur.fetchone()[0]
+
+        # Formador local
+        formador_local = request.form.get(f"formador_local_{m}") or ""
+
+        # PBA
         pba = request.form.get(f"pba_{m}") or ""
         pba_qtd = int(request.form.get(f"pba_qtd_{m}") or 0)
         if pba != "Sim":
             pba_qtd = 0
 
+        # Alfabetização EJA
         eja_alf = request.form.get(f"eja_alf_{m}") or ""
         eja_alf_qtd = int(request.form.get(f"eja_alf_qtd_{m}") or 0)
         if eja_alf != "Sim":
             eja_alf_qtd = 0
 
+        # EJA Anos Iniciais
         eja_ai = request.form.get(f"eja_ai_{m}") or ""
         eja_ai_qtd = int(request.form.get(f"eja_ai_qtd_{m}") or 0)
         if eja_ai != "Sim":
             eja_ai_qtd = 0
 
-        meses = ["jan","fev","mar","abr","mai","jun","jul","ago","setm"]
+        # Meses dinâmicos
         valores_meses = [int(request.form.get(f"{mes}_{m}") or 0) for mes in meses]
 
-        cur.execute(f"""
+        # SQL dinâmico
+        sql = f"""
             INSERT INTO respostas (
                 usuario_id, municipio_id, municipio_nome, estado,
                 formador_local,
@@ -200,15 +217,17 @@ def salvar():
                 %s,%s,
                 %s,%s,
                 %s,%s,
-                {",".join(["%s"]*9)},
+                {",".join(["%s"] * len(meses))},
                 %s
             )
-        """, (
+        """
+
+        cur.execute(sql, (
             usuario,
             m,
-            request.form.get(f"nome_{m}"),
+            municipio_nome,
             estado,
-            request.form.get(f"formador_local_{m}"),
+            formador_local,
             pba, pba_qtd,
             eja_alf, eja_alf_qtd,
             eja_ai, eja_ai_qtd,
